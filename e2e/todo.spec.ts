@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("Email").fill(email!);
   await page.getByLabel("Password").fill(password!);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "TaskFlow" })).toBeVisible();
+  await expect(page.getByLabel("New todo")).toBeVisible();
 });
 
 test("signed-out visitors are redirected to /login", async ({ browser }) => {
@@ -27,14 +27,17 @@ test("add, prioritise, complete, uncomplete, colour and delete a todo", async ({
   const title = `e2e ${Date.now()}`;
 
   await page.getByLabel("New todo").fill(title);
-  await page.getByRole("radio", { name: "P0" }).first().click();
+  await page.getByRole("button", { name: "Priority", exact: true }).click();
+  await page.getByRole("option", { name: "P0", exact: true }).click();
   await page.getByRole("button", { name: "Add" }).click();
   const row = page.getByRole("listitem").filter({ hasText: title });
   await expect(row).toBeVisible();
   await expect(row).toContainText("P0");
 
+  // Finished tasks move into the "Completed" section at the bottom (open by default).
   await row.getByRole("checkbox").check();
-  await expect(row.getByRole("checkbox")).toBeChecked();
+  await expect(page.getByRole("region", { name: "Completed tasks" })).toContainText(title);
+  await expect(page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox")).toBeChecked();
   await page.reload();
   await expect(page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox")).toBeChecked();
 
@@ -60,4 +63,21 @@ test("add, prioritise, complete, uncomplete, colour and delete a todo", async ({
   await expect(page.getByText(title)).toBeHidden({ timeout: 8000 });
   await page.reload();
   await expect(page.getByText(title)).toHaveCount(0);
+});
+
+test("quick-add understands dates, priority, lists and tags", async ({ page }) => {
+  const title = `quick ${Date.now()}`;
+  await page.getByLabel("New todo").fill(`${title} tomorrow !1 #E2E @auto`);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+
+  const row = page.getByRole("listitem").filter({ hasText: title });
+  await expect(row).toContainText("Tomorrow");
+  await expect(row).toContainText("P1");
+  await expect(row).toContainText("E2E");
+  await expect(row).toContainText("@auto");
+
+  // Clean up so reruns start from the same state.
+  await page.getByRole("button", { name: `Edit: ${title}` }).click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText(title)).toBeHidden({ timeout: 8000 });
 });

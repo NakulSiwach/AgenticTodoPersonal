@@ -18,3 +18,17 @@
 
 Production build: passes with dummy env (`npm run build`).
 Live URL: https://agentic-todo-personal.vercel.app
+
+## UI redesign (v2)
+
+| Item | Status | Verification |
+|------|--------|--------------|
+| Tailwind actually compiled (`@tailwindcss/postcss` + `postcss.config.mjs`; removed unused `@tailwindcss/turbopack`) | done | screenshots, `npm run build` |
+| Responsive shell: sidebar (laptop/tablet), slide-in menu + bottom quick-add (phone) | done | screenshots at 360, 390, 768, 1280 px; no horizontal overflow |
+| Views: Inbox, Today, Upcoming, All, Completed, Lists, Tags; search; sort; priority filter | done | unit + component tests |
+| Due dates, repeat, subtasks, tags, lists, quick-add parsing (`tomorrow !1 #list @tag`) | done | unit + component tests |
+| Dark/light/system theme toggle, keyboard shortcuts (`n`/`q` add, `/` search) | done | screenshots |
+| Migration `0002_features.sql` | written, **needs running by user** | - |
+| E2E specs updated for new UI | written, not run (needs E2E_EMAIL/E2E_PASSWORD) | typecheck only |
+
+Tests: 57 unit + component passing.

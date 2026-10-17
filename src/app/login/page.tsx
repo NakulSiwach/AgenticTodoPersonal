@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ListTodo } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -46,15 +47,23 @@ export default function LoginPage() {
   };
 
   const field =
-    "min-h-11 w-full rounded-xl border border-neutral-300 bg-white px-3 text-base dark:border-neutral-700 dark:bg-neutral-900";
+    "min-h-11 w-full rounded-xl border border-neutral-300 bg-white px-3 text-base dark:border-neutral-700 dark:bg-neutral-950";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4">
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-8">
+      <span className="mb-4 grid size-12 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30">
+        <ListTodo size={26} aria-hidden="true" />
+      </span>
       <h1 className="mb-1 text-3xl font-bold">TaskFlow</h1>
       <p className="mb-6 text-neutral-500 dark:text-neutral-400">
-        {mode === "signin" ? "Sign in to your list" : "Create your account"}
+        {mode === "signin"
+          ? "Welcome back. Sign in to see your tasks."
+          : "Create an account to keep your tasks in sync on every device."}
       </p>
-      <form onSubmit={submit} className="space-y-4">
+      <form
+        onSubmit={submit}
+        className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+      >
         <div>
           <label htmlFor="email" className="mb-1 block text-sm font-medium">
             Email

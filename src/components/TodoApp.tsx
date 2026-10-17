@@ -1,31 +1,83 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { filterTodos, sortTodos } from "@/lib/sort";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { formatDue, nextOccurrence, today as todayISO } from "@/lib/dates";
+import { createClient } from "@/lib/supabase/client";
 import { useCreateTodo, useDeleteTodo, useTodos, useUpdateTodo } from "@/lib/queries";
-import type { Priority, PriorityFilter, StatusFilter, Todo, TodoPatch } from "@/lib/types";
-import { Composer } from "./Composer";
+import type { Priority, PriorityFilter, SortKey, Todo, TodoPatch, ViewKey } from "@/lib/types";
+import {
+  applyFilters,
+  countViews,
+  groupOpen,
+  inView,
+  sortDone,
+  todayProgress,
+  viewTitle,
+} from "@/lib/views";
+import { Composer, type ComposerInput } from "./Composer";
 import { EditSheet } from "./EditSheet";
-import { FilterBar } from "./FilterBar";
-import { Header } from "./Header";
+import { Sidebar } from "./Sidebar";
+import { Toolbar } from "./Toolbar";
 import { useToast } from "./Toast";
 import { TodoList } from "./TodoList";
 
 const UNDO_WINDOW_MS = 5000;
 
+/** Local "today", refreshed so the app stays right when left open past midnight. */
+function useToday(): string {
+  const [day, setDay] = useState(() => todayISO());
+  useEffect(() => {
+    const tick = () => setDay(todayISO());
+    const id = setInterval(tick, 60_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
+  return day;
+}
+
+const EMPTY_HINTS: Record<string, string> = {
+  inbox: "Your inbox is empty. Add a task below to get started.",
+  today: "Nothing due today. Enjoy it, or add a task for today.",
+  upcoming: "No upcoming tasks. Give a task a due date and it will show up here.",
+  all: "Add your first task below.",
+  completed: "Finished tasks will show up here.",
+};
+
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  return (
+    el.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) ||
+    el.closest("[role=listbox]") !== null
+  );
+}
+
 export function TodoApp({ email }: { email: string }) {
+  const router = useRouter();
+  const qc = useQueryClient();
   const { data, isLoading, isError, error, refetch } = useTodos();
   const create = useCreateTodo();
   const update = useUpdateTodo();
   const remove = useDeleteTodo();
   const toast = useToast();
+  const today = useToday();
 
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [view, setView] = useState<ViewKey>("all");
+  const [sort, setSort] = useState<SortKey>("smart");
   const [priority, setPriority] = useState<PriorityFilter>("all");
+  const [search, setSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   // Todos waiting out the undo window: hidden from the list, not yet deleted.
   const [pendingDelete, setPendingDelete] = useState<ReadonlySet<string>>(new Set());
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const composerRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const map = timers.current;
@@ -36,17 +88,72 @@ export function TodoApp({ email }: { email: string }) {
     () => (data ?? []).filter((t) => !pendingDelete.has(t.id)),
     [data, pendingDelete],
   );
-  const visible = useMemo(
-    () => sortTodos(filterTodos(all, status, priority)),
-    [all, status, priority],
+  const counts = useMemo(() => countViews(all, today), [all, today]);
+  const listNames = useMemo(() => counts.lists.map((l) => l.name), [counts.lists]);
+  const tagNames = useMemo(() => counts.tags.map((t) => t.name), [counts.tags]);
+  const searching = search.trim().length > 0;
+
+  // A search looks through every task, not just the current view.
+  const scoped = useMemo(
+    () => (searching ? all : all.filter((t) => inView(t, view, today))),
+    [all, view, today, searching],
   );
-  const activeCount = all.filter((t) => !t.completed).length;
+  const matched = useMemo(() => applyFilters(scoped, priority, search), [scoped, priority, search]);
+  const open = useMemo(() => matched.filter((t) => !t.completed), [matched]);
+  const groups = useMemo(() => groupOpen(open, sort, today), [open, sort, today]);
+  const done = useMemo(
+    () => (view === "upcoming" && !searching ? [] : sortDone(matched.filter((t) => t.completed))),
+    [matched, view, searching],
+  );
+
   const editing = all.find((t) => t.id === editingId) ?? null;
+  const progress = view === "today" && !searching ? todayProgress(all, today) : null;
+  const subtitle = progress
+    ? `${progress.done} of ${progress.total} done`
+    : `${open.length} active${done.length ? ` · ${done.length} completed` : ""}`;
 
   const patch = useCallback(
     (id: string, p: TodoPatch) => update.mutate({ id, patch: p }),
     [update],
   );
+
+  const changeView = (v: ViewKey) => {
+    setView(v);
+    setSearch("");
+    setMenuOpen(false);
+  };
+
+  const signOut = async () => {
+    await createClient().auth.signOut();
+    qc.clear();
+    router.replace("/login");
+    router.refresh();
+  };
+
+  const toggle = (t: Todo) => {
+    // Finishing a repeating task schedules its next occurrence instead of closing it.
+    if (!t.completed && t.repeat && t.due_date) {
+      const previous = t.due_date;
+      const next = nextOccurrence(previous, t.repeat, today);
+      patch(t.id, { due_date: next });
+      toast.push({
+        message: `Done. Next: ${formatDue(next, today).label}`,
+        actionLabel: "Undo",
+        onAction: () => patch(t.id, { due_date: previous }),
+      });
+      return;
+    }
+    patch(t.id, { completed: !t.completed });
+    if (!t.completed) {
+      toast.push({
+        message: "Task completed",
+        actionLabel: "Undo",
+        onAction: () => patch(t.id, { completed: false }),
+      });
+    }
+  };
+
+  const add = (input: ComposerInput) => create.mutate({ ...input, id: crypto.randomUUID() });
 
   const scheduleDelete = (todo: Todo) => {
     setEditingId(null);
@@ -74,47 +181,129 @@ export function TodoApp({ email }: { email: string }) {
     });
   };
 
+  const clearCompleted = () => {
+    const finished = all.filter((t) => t.completed);
+    if (finished.length === 0) return;
+    if (!window.confirm(`Permanently delete ${finished.length} completed task(s)?`)) return;
+    finished.forEach((t) => remove.mutate(t.id));
+  };
+
+  // Keyboard shortcuts: n / q = new task, / = search, Esc = close.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target) || editingId) return;
+      if (e.key === "n" || e.key === "q") {
+        e.preventDefault();
+        composerRef.current?.focus();
+      } else if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editingId]);
+
+  const sidebar = (
+    <Sidebar view={view} counts={counts} email={email} onView={changeView} onSignOut={signOut} />
+  );
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
-      <Header email={email} />
-      <main className="flex-1 px-4 pb-64">
-        <FilterBar
-          status={status}
-          priority={priority}
-          onStatus={setStatus}
-          onPriority={setPriority}
-        />
-        <p className="py-2 text-sm text-neutral-500 dark:text-neutral-400" aria-live="polite">
-          {activeCount} active
-        </p>
-        {isError ? (
-          <div role="alert" className="py-8 text-center">
-            <p className="mb-3 text-red-600 dark:text-red-400">
-              Couldn&apos;t load your todos{error instanceof Error ? `: ${error.message}` : ""}.
-            </p>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="min-h-11 rounded-xl bg-indigo-600 px-5 font-semibold text-white"
-            >
-              Retry
-            </button>
+    <div className="min-h-dvh md:flex">
+      <aside className="hidden border-r border-neutral-200 bg-white md:sticky md:top-0 md:block md:h-dvh md:w-64 md:shrink-0 dark:border-neutral-800 dark:bg-neutral-950">
+        {sidebar}
+      </aside>
+
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="anim-fade absolute inset-0 bg-black/50" aria-hidden="true" onClick={() => setMenuOpen(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            className="anim-fade absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl dark:bg-neutral-950"
+          >
+            {sidebar}
           </div>
-        ) : (
-          <TodoList
-            todos={visible}
-            loading={isLoading}
-            onToggle={(t) => patch(t.id, { completed: !t.completed })}
-            onOpen={(t) => setEditingId(t.id)}
-            onPriority={(t, p: Priority) => patch(t.id, { priority: p })}
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <Toolbar
+          ref={searchRef}
+          title={searching ? "Search results" : viewTitle(view)}
+          subtitle={subtitle}
+          progress={progress}
+          search={search}
+          sort={sort}
+          priority={priority}
+          onSearch={setSearch}
+          onSort={setSort}
+          onPriority={setPriority}
+          onMenu={() => setMenuOpen(true)}
+        />
+        <main className="mx-auto max-w-3xl px-4 pt-4 pb-60 md:pb-16">
+          <Composer
+            ref={composerRef}
+            onAdd={add}
+            today={today}
+            defaultDue={view === "today" ? today : null}
+            defaultList={view.startsWith("list:") ? view.slice(5) : null}
+            lists={listNames}
+            knownTags={tagNames}
           />
-        )}
-      </main>
-      <Composer onAdd={(input) => create.mutate({ ...input, id: crypto.randomUUID() })} />
+          {isError ? (
+            <div role="alert" className="py-8 text-center">
+              <p className="mb-3 text-red-600 dark:text-red-400">
+                Couldn&apos;t load your todos{error instanceof Error ? `: ${error.message}` : ""}.
+              </p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="min-h-11 rounded-xl bg-indigo-600 px-5 font-semibold text-white"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <TodoList
+                key={`${view}|${searching}`}
+                groups={groups}
+                done={done}
+                loading={isLoading}
+                today={today}
+                showList={!view.startsWith("list:")}
+                filtered={searching || priority !== "all"}
+                emptyHint={EMPTY_HINTS[view] ?? "Add a task below to put it in this list."}
+                onToggle={toggle}
+                onOpen={(t) => setEditingId(t.id)}
+                onPriority={(t, p: Priority) => patch(t.id, { priority: p })}
+              />
+              {view === "completed" && done.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearCompleted}
+                  className="mt-4 min-h-11 rounded-xl border border-red-600 px-4 text-sm font-semibold text-red-600 dark:border-red-400 dark:text-red-400"
+                >
+                  Delete all completed
+                </button>
+              )}
+            </>
+          )}
+        </main>
+      </div>
+
       {editing && (
         <EditSheet
           key={editing.id}
           todo={editing}
+          today={today}
+          lists={listNames}
           onClose={() => setEditingId(null)}
           onSave={(p) => {
             patch(editing.id, p);

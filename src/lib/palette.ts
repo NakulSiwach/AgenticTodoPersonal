@@ -104,3 +104,28 @@ export function isReadable(text: TextColorKey | null, highlight: HighlightKey | 
     contrastRatio(darkText, darkBg) >= MIN_CONTRAST
   );
 }
+
+/** Checkbox outline per priority, so urgency is visible at a glance (Todoist-style). */
+export const PRIORITY_RING: Record<Priority, string> = {
+  0: "border-red-500",
+  1: "border-orange-500",
+  2: "border-amber-500",
+  3: "border-blue-500",
+  4: "border-neutral-400",
+};
+
+export const PRIORITY_DOT: Record<Priority, string> = {
+  0: "bg-red-600",
+  1: "bg-orange-500",
+  2: "bg-amber-400",
+  3: "bg-blue-500",
+  4: "bg-gray-400",
+};
+
+export const PRIORITY_HINTS: Record<Priority, string> = {
+  0: "Urgent",
+  1: "High",
+  2: "Medium",
+  3: "Low",
+  4: "Lowest",
+};

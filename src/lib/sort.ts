@@ -1,4 +1,4 @@
-import type { PriorityFilter, StatusFilter, Todo } from "./types";
+import type { Todo } from "./types";
 
 /** Incomplete first, then priority ascending (P0 first), then newest first. */
 export function compareTodos(a: Todo, b: Todo): number {
@@ -9,17 +9,4 @@ export function compareTodos(a: Todo, b: Todo): number {
 
 export function sortTodos(todos: Todo[]): Todo[] {
   return [...todos].sort(compareTodos);
-}
-
-export function filterTodos(
-  todos: Todo[],
-  status: StatusFilter,
-  priority: PriorityFilter,
-): Todo[] {
-  return todos.filter((t) => {
-    if (status === "active" && t.completed) return false;
-    if (status === "completed" && !t.completed) return false;
-    if (priority !== "all" && t.priority !== priority) return false;
-    return true;
-  });
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HIGHLIGHT_COLOR_KEYS, TEXT_COLOR_KEYS } from "./types";
+import { HIGHLIGHT_COLOR_KEYS, REPEATS, TEXT_COLOR_KEYS } from "./types";
 
 export const titleSchema = z
   .string()
@@ -23,6 +23,18 @@ export const prioritySchema = z.union([
 export const textColorSchema = z.enum(TEXT_COLOR_KEYS).nullable();
 export const highlightSchema = z.enum(HIGHLIGHT_COLOR_KEYS).nullable();
 
+export const dueDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date")
+  .nullable();
+export const listNameSchema = z.string().trim().min(1).max(40, "List name is too long").nullable();
+export const tagSchema = z.string().trim().min(1).max(30, "Tag is too long");
+export const tagsSchema = z.array(tagSchema).max(10, "At most 10 tags");
+export const repeatSchema = z.enum(REPEATS).nullable();
+export const subtasksSchema = z
+  .array(z.object({ id: z.string().min(1), title: titleSchema, done: z.boolean() }))
+  .max(50, "At most 50 subtasks");
+
 export const newTodoSchema = z.object({
   id: z.string().uuid(),
   title: titleSchema,
@@ -30,6 +42,11 @@ export const newTodoSchema = z.object({
   notes: notesSchema.optional(),
   text_color: textColorSchema.optional(),
   highlight_color: highlightSchema.optional(),
+  due_date: dueDateSchema.optional(),
+  list_name: listNameSchema.optional(),
+  tags: tagsSchema.optional(),
+  subtasks: subtasksSchema.optional(),
+  repeat: repeatSchema.optional(),
 });
 
 export const todoPatchSchema = z
@@ -40,5 +57,10 @@ export const todoPatchSchema = z
     completed: z.boolean(),
     text_color: textColorSchema,
     highlight_color: highlightSchema,
+    due_date: dueDateSchema,
+    list_name: listNameSchema,
+    tags: tagsSchema,
+    subtasks: subtasksSchema,
+    repeat: repeatSchema,
   })
   .partial();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterTodos, sortTodos } from "@/lib/sort";
+import { sortTodos } from "@/lib/sort";
 import type { Priority, Todo } from "@/lib/types";
 
 function todo(id: string, priority: Priority, completed: boolean, created: string): Todo {
@@ -13,6 +13,11 @@ function todo(id: string, priority: Priority, completed: boolean, created: strin
     completed_at: completed ? created : null,
     text_color: null,
     highlight_color: null,
+    due_date: null,
+    list_name: null,
+    tags: [],
+    subtasks: [],
+    repeat: null,
     created_at: created,
     updated_at: created,
   };
@@ -33,16 +38,5 @@ describe("sortTodos", () => {
     const copy = [...fixture];
     sortTodos(fixture);
     expect(fixture).toEqual(copy);
-  });
-});
-
-describe("filterTodos", () => {
-  it("filters by status", () => {
-    expect(filterTodos(fixture, "active", "all")).toHaveLength(3);
-    expect(filterTodos(fixture, "completed", "all").map((t) => t.id)).toEqual(["P2 done"]);
-  });
-  it("filters by priority", () => {
-    expect(filterTodos(fixture, "all", 0)).toHaveLength(2);
-    expect(filterTodos(fixture, "active", 2)).toHaveLength(0);
   });
 });

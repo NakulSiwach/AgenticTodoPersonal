@@ -21,6 +21,14 @@ _Last updated: 2026-10-17_
 
 ## Your actions (in order, about 10 minutes total)
 
+### NEW – Action 0: add the v2 columns to your database (1 min, required for the new features)
+The redesigned app adds due dates, lists, tags, subtasks and repeating tasks. Run once:
+1. Open https://supabase.com/dashboard/project/rjjchnqajfhmpivimcag/sql/new
+2. Paste all of `supabase/migrations/0002_features.sql` and click **Run** (safe to re-run; existing tasks are untouched).
+
+Until you do, the app still loads, but saving a due date, list, tag, subtask or repeat shows
+"Database needs the latest update: run supabase/migrations/0002_features.sql".
+
 ### ~~Action 1 and 2~~ - done, thank you
 
 ### ~~Action 3 (Vercel)~~ - done, live at https://agentic-todo-personal.vercel.app

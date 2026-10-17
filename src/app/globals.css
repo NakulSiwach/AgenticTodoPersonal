@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
+/* Dark mode follows the `.dark` class (set from the saved choice or the system setting). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #171717;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  color-scheme: dark;
 }
 
 body {
@@ -23,6 +26,35 @@ body {
 :focus-visible {
   outline: 2px solid #6366f1;
   outline-offset: 2px;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes slide-left {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.anim-sheet {
+  animation: slide-up 0.18s ease-out;
+}
+@media (min-width: 768px) {
+  .anim-sheet {
+    animation: slide-left 0.18s ease-out;
+  }
+}
+.anim-fade {
+  animation: fade-in 0.15s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

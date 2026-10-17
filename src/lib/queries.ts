@@ -56,6 +56,11 @@ export function useCreateTodo() {
         completed_at: null,
         text_color: input.text_color ?? null,
         highlight_color: input.highlight_color ?? null,
+        due_date: input.due_date ?? null,
+        list_name: input.list_name ?? null,
+        tags: input.tags ?? [],
+        subtasks: input.subtasks ?? [],
+        repeat: input.repeat ?? null,
         created_at: now,
         updated_at: now,
       };

@@ -1,34 +1,31 @@
-import { PRIORITIES, type Priority } from "@/lib/types";
+import { type Priority } from "@/lib/types";
+import { priorityOptions } from "@/lib/options";
 import { PRIORITY_STYLES } from "@/lib/palette";
+import { Dropdown } from "./Dropdown";
 
 type Props = {
   priority: Priority;
-  /** When given, tapping the badge opens a native priority menu. */
+  /** When given, tapping the badge opens the priority menu. */
   onChange?: (p: Priority) => void;
   label?: string;
 };
 
+const base = "inline-flex h-8 min-w-11 items-center justify-center rounded-full px-3 text-xs font-bold";
+
 export function PriorityBadge({ priority, onChange, label }: Props) {
   const { label: text, cls } = PRIORITY_STYLES[priority];
+  if (!onChange) return <span className={`${base} ${cls}`}>{text}</span>;
   return (
-    <span
-      className={`relative inline-flex h-8 min-w-11 items-center justify-center rounded-full px-3 text-xs font-bold ${cls}`}
+    <Dropdown
+      label={label ?? "Change priority"}
+      title="Priority"
+      alignRight
+      value={priority}
+      options={priorityOptions}
+      onChange={onChange}
+      className={`${base} ${cls} cursor-pointer transition hover:brightness-110 active:scale-95`}
     >
       {text}
-      {onChange && (
-        <select
-          aria-label={label ?? "Change priority"}
-          value={priority}
-          onChange={(e) => onChange(Number(e.target.value) as Priority)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        >
-          {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
-              {PRIORITY_STYLES[p].label}
-            </option>
-          ))}
-        </select>
-      )}
-    </span>
+    </Dropdown>
   );
 }

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/Toast";
 import { TodoApp } from "@/components/TodoApp";
-import type { Todo } from "@/lib/types";
+import type { Subtask, Todo } from "@/lib/types";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ auth: { signOut: vi.fn() } }) }));
@@ -23,6 +23,11 @@ const base = {
   completed_at: null,
   text_color: null,
   highlight_color: null,
+  due_date: null,
+  list_name: null,
+  tags: [] as string[],
+  subtasks: [] as Subtask[],
+  repeat: null,
   updated_at: "2026-01-01T00:00:00Z",
 } as const;
 
@@ -59,6 +64,10 @@ beforeEach(() => {
       id: input.id,
       title: input.title,
       priority: input.priority,
+      due_date: input.due_date ?? null,
+      list_name: input.list_name ?? null,
+      tags: input.tags ?? [],
+      repeat: input.repeat ?? null,
       completed: false,
       created_at: "2026-01-03T00:00:00Z",
     };
@@ -85,8 +94,34 @@ describe("TodoApp", () => {
     renderApp();
     const box = await screen.findByLabelText(/Mark as done: Write report/);
     await userEvent.click(box);
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith("1", { completed: true }));
+    // The finished task moves to the Completed section (open by default), with an undo toast.
+    expect(await screen.findByText("Task completed")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Mark as done: Write report/)).not.toBeInTheDocument();
     expect(await screen.findByLabelText(/Mark as not done: Write report/)).toBeChecked();
-    expect(api.updateTodo).toHaveBeenCalledWith("1", { completed: true });
+  });
+
+  it("undoes a completion from the toast", async () => {
+    renderApp();
+    await userEvent.click(await screen.findByLabelText(/Mark as done: Write report/));
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(api.updateTodo).toHaveBeenLastCalledWith("1", { completed: false }),
+    );
+    expect(await screen.findByLabelText(/Mark as done: Write report/)).not.toBeChecked();
+  });
+
+  it("moves a repeating task to its next date instead of completing it", async () => {
+    db = [{ ...seed[0], due_date: "2000-01-01", repeat: "daily" }, seed[1]];
+    renderApp();
+    await userEvent.click(await screen.findByLabelText(/Mark as done: Write report/));
+    await waitFor(() =>
+      expect(api.updateTodo).toHaveBeenCalledWith("1", {
+        due_date: expect.stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
+      }),
+    );
+    expect(vi.mocked(api.updateTodo).mock.calls[0][1]).not.toHaveProperty("completed");
+    expect(await screen.findByText(/Done. Next:/)).toBeInTheDocument();
   });
 
   it("reverts the toggle and shows a toast when the server rejects", async () => {
@@ -111,7 +146,8 @@ describe("TodoApp", () => {
     renderApp();
     await loaded();
     await userEvent.type(screen.getByLabelText("New todo"), "Urgent thing");
-    await userEvent.click(screen.getByRole("radio", { name: "P0" }));
+    await userEvent.click(screen.getByRole("button", { name: "Priority" }));
+    await userEvent.click(screen.getByRole("option", { name: "P0" }));
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(api.createTodo).toHaveBeenCalledWith({
       id: expect.any(String),
@@ -142,17 +178,122 @@ describe("TodoApp", () => {
     expect(api.updateTodo).not.toHaveBeenCalled();
     finishInsert();
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledTimes(1));
-    expect(await screen.findByLabelText(/Mark as not done: Quick one/)).toBeChecked();
+    expect(await screen.findByText("Task completed")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Mark as done: Quick one/)).not.toBeInTheDocument();
   });
 
-  it("filters by status", async () => {
+  it("shows finished tasks in the Completed view", async () => {
     db = [{ ...seed[0], completed: true }, seed[1]];
     renderApp();
-    await loaded();
+    await screen.findByText("Buy milk");
     await userEvent.click(screen.getByRole("button", { name: "Completed" }));
     const rows = screen.getAllByRole("listitem");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent("Write report");
+  });
+
+  it("parses quick-add text into date, priority, list and tags", async () => {
+    renderApp();
+    await loaded();
+    await userEvent.type(screen.getByLabelText("New todo"), "Pay rent tomorrow !1 #Home @bills");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(api.createTodo).toHaveBeenCalledWith({
+        id: expect.any(String),
+        title: "Pay rent",
+        priority: 1,
+        due_date: expect.stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
+        list_name: "Home",
+        tags: ["bills"],
+      }),
+    );
+  });
+
+  it("shows the Completed section open by default", async () => {
+    db = [{ ...seed[0], completed: true }, seed[1]];
+    renderApp();
+    expect(await screen.findByLabelText(/Mark as not done: Write report/)).toBeVisible();
+  });
+
+  it("changes a task's priority from the row dropdown", async () => {
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "Change priority of Buy milk" }));
+    await userEvent.click(screen.getByRole("option", { name: "P0" }));
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith("2", { priority: 0 }));
+  });
+
+  it("closes a dropdown with Escape without closing the sheet", async () => {
+    renderApp();
+    await userEvent.click(await screen.findByLabelText("Edit: Write report"));
+    const sheet = within(screen.getByRole("dialog"));
+    await userEvent.click(sheet.getByRole("button", { name: "Repeat" }));
+    expect(screen.getByRole("listbox", { name: "Repeat" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("adds a task with a one-tap quick tag", async () => {
+    renderApp();
+    await loaded();
+    await userEvent.type(screen.getByLabelText("New todo"), "Send invoice");
+    await userEvent.click(within(screen.getByRole("group", { name: "Quick tags" })).getByRole("button", { name: "Office" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(api.createTodo).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Send invoice", tags: ["Office"] }),
+      ),
+    );
+  });
+
+  it("explains the quick-add syntax", async () => {
+    renderApp();
+    await loaded();
+    await userEvent.click(screen.getByRole("button", { name: "Quick-add tips" }));
+    expect(screen.getByText(/#ListName puts the task in that list/)).toBeInTheDocument();
+    expect(screen.getByText(/@tag adds a label/)).toBeInTheDocument();
+  });
+
+  it("searches across all tasks", async () => {
+    renderApp();
+    await loaded();
+    await userEvent.type(screen.getByLabelText("Search tasks"), "milk");
+    const rows = screen.getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Buy milk");
+    await userEvent.clear(screen.getByLabelText("Search tasks"));
+    await userEvent.type(screen.getByLabelText("Search tasks"), "zzz");
+    expect(screen.getByText("No matching tasks")).toBeInTheDocument();
+  });
+
+  it("filters by list from the sidebar", async () => {
+    db = [{ ...seed[0], list_name: "Work" }, seed[1]];
+    renderApp();
+    await loaded();
+    await userEvent.click(screen.getByRole("button", { name: /^Work/ }));
+    const rows = screen.getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Write report");
+  });
+
+  it("saves due date, subtasks and tags from the edit sheet", async () => {
+    renderApp();
+    await userEvent.click(await screen.findByLabelText("Edit: Write report"));
+    const sheet = within(screen.getByRole("dialog"));
+    await userEvent.click(sheet.getByRole("button", { name: "Tomorrow" }));
+    await userEvent.type(sheet.getByLabelText("New subtask"), "Outline{Enter}");
+    await userEvent.type(sheet.getByLabelText("Tags"), "work{Enter}");
+    await userEvent.click(sheet.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(api.updateTodo).toHaveBeenCalledWith(
+        "1",
+        expect.objectContaining({
+          due_date: expect.stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
+          tags: ["work"],
+          subtasks: [expect.objectContaining({ title: "Outline", done: false })],
+        }),
+      ),
+    );
   });
 
   it("saves colors from the edit sheet", async () => {
