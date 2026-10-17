@@ -14,3 +14,5 @@ Deviations and judgement calls made while building, versus `docs/`.
 | 8 | Playwright projects: Pixel 7 + Desktop Chrome only (no iPhone/WebKit) | Avoids a heavy WebKit download; iOS covered by manual checklist |
 | 9 | RLS two-account isolation test is a manual SQL/dashboard check, see `docs/06` | Needs two real accounts on the live project |
 | 10 | Service worker caches static assets and the offline page only | Todo data needs auth and must never be served stale from cache |
+| 11 | New todos get their UUID on the client (`id` is sent on insert) instead of a temporary id | The optimistic row keeps its identity (no remount, no disabled state). Found via e2e: a fast tap could be lost during the swap |
+| 12 | Updates/deletes wait for that todo's pending insert (`pendingCreates` in `queries.ts`) | Otherwise a quick tap could update a row the server hasn't stored yet. Covered by a component test |

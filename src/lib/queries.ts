@@ -6,7 +6,14 @@ import { createTodo, deleteTodo, listTodos, updateTodo } from "@/lib/todos";
 import type { NewTodo, Todo, TodoPatch } from "@/lib/types";
 
 export const TODOS_KEY = ["todos"] as const;
-export const TEMP_PREFIX = "temp-";
+
+// Inserts still in flight, by todo id. Todos get their id on the client, so a quick tap can
+// target a row the server has not stored yet; later writes wait for the insert to land first.
+const pendingCreates = new Map<string, Promise<unknown>>();
+
+async function afterCreate(id: string) {
+  await pendingCreates.get(id)?.catch(() => {});
+}
 
 export function useTodos() {
   return useQuery({ queryKey: TODOS_KEY, queryFn: listTodos });
@@ -29,12 +36,18 @@ export function useCreateTodo() {
   const cache = useTodoCache();
   const toast = useToast();
   return useMutation({
-    mutationFn: (input: NewTodo) => createTodo(input),
+    mutationFn: (input: NewTodo) => {
+      const request = createTodo(input);
+      pendingCreates.set(input.id, request);
+      const clear = () => pendingCreates.delete(input.id);
+      request.then(clear, clear);
+      return request;
+    },
     onMutate: async (input) => {
       const prev = await cache.snapshot();
       const now = new Date().toISOString();
       const optimistic: Todo = {
-        id: `${TEMP_PREFIX}${crypto.randomUUID()}`,
+        id: input.id,
         user_id: "",
         title: input.title.trim(),
         notes: input.notes ?? null,
@@ -61,7 +74,10 @@ export function useUpdateTodo() {
   const cache = useTodoCache();
   const toast = useToast();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: TodoPatch }) => updateTodo(id, patch),
+    mutationFn: async ({ id, patch }: { id: string; patch: TodoPatch }) => {
+      await afterCreate(id);
+      return updateTodo(id, patch);
+    },
     onMutate: async ({ id, patch }) => {
       const prev = await cache.snapshot();
       cache.set((list) =>
@@ -88,7 +104,10 @@ export function useDeleteTodo() {
   const cache = useTodoCache();
   const toast = useToast();
   return useMutation({
-    mutationFn: (id: string) => deleteTodo(id),
+    mutationFn: async (id: string) => {
+      await afterCreate(id);
+      return deleteTodo(id);
+    },
     onMutate: async (id) => {
       const prev = await cache.snapshot();
       cache.set((list) => list.filter((t) => t.id !== id));

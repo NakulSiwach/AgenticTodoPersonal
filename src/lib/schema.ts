@@ -24,6 +24,7 @@ export const textColorSchema = z.enum(TEXT_COLOR_KEYS).nullable();
 export const highlightSchema = z.enum(HIGHLIGHT_COLOR_KEYS).nullable();
 
 export const newTodoSchema = z.object({
+  id: z.string().uuid(),
   title: titleSchema,
   priority: prioritySchema,
   notes: notesSchema.optional(),

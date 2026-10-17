@@ -7,26 +7,20 @@ _Last updated: 2026-10-17_
 | Area | State |
 |------|-------|
 | App code (UI, auth, TODOs, priorities, colors, highlights, PWA) | ✅ Done |
-| Automated tests (28 unit + component) | ✅ Passing |
+| Automated tests (30 unit + component) | ✅ Passing |
 | Typecheck, lint, production build | ✅ Passing |
 | Code on GitHub (`master`) | ✅ Pushed |
 | Supabase project connected (URL + key in `.env.local`) | ✅ Key verified working |
-| Database table `todos` created | ⏳ **Waiting on you** (Action 1) |
-| Email confirmation turned off | ⏳ **Waiting on you** (Action 2) |
-| End-to-end tests against real database | ⏳ Blocked on Action 1 + 2 |
-| Deployed to Vercel (public URL) | ⏳ Blocked on Action 3 |
+| Database table `todos` created | ✅ Done, verified |
+| Email confirmation turned off | ✅ Done, verified |
+| End-to-end browser tests on your real database (phone + desktop sizes) | ✅ 4/4 passing |
+| Security check: user B can't see/change user A's data | ✅ 10/10 passing |
+| Deployed to Vercel (public URL) | ⏳ **Waiting on you** (Action 3) |
 | Installed on your phone | ⏳ Last step |
 
 ## Your actions (in order, about 10 minutes total)
 
-### Action 1 – Create the database table (2 min)
-1. Open https://supabase.com/dashboard/project/rjjchnqajfhmpivimcag/sql/new
-2. Open `supabase/migrations/0001_init.sql` in this repo, copy **all** of it, paste, click **Run**.
-3. Expect "Success. No rows returned".
-
-### Action 2 – Turn off email confirmation (1 min)
-Dashboard → **Authentication** → **Sign In / Providers** (or "Providers") → **Email** → switch **Confirm email** OFF → Save.
-(Without this, sign-up waits for an email link. For a personal app, off is fine.)
+### ~~Action 1 and 2~~ - done, thank you
 
 ### Action 3 – Deploy on Vercel (5 min)
 1. Go to https://vercel.com/signup and sign in **with GitHub**.
@@ -50,11 +44,13 @@ Dashboard → **Authentication → URL Configuration**:
 - **Android (Chrome):** open the URL → sign up/in → ⋮ menu → *Install app*.
 - **iPhone (Safari):** open the URL → Share → *Add to Home Screen*.
 
-## What I do next (after Actions 1–2)
-1. Verify the table + security rules from outside (anonymous access must return nothing).
-2. Create a throwaway test account and run the Playwright end-to-end tests (add, priority, complete/uncomplete, colors, delete + undo).
-3. Prove one account cannot read another's TODOs.
-4. After you send the Vercel URL: check the live site (HTTPS, headers, login, data), then update this file.
+## What I do next
+1. After you send the Vercel URL: check the live site (HTTPS, headers, login, data) and update this file.
+2. Optional extras if you want them: export/backup button, due dates, search.
+
+## Housekeeping
+- The tests created throwaway accounts in Supabase (Authentication -> Users): `rlscheck.*@gmail.com` and `e2e.*@gmail.com`. They're fake addresses and safe to delete.
+- Bug found and fixed by the e2e tests: a very fast tap on a just-added todo could be lost. Todos now get their id on your device and later changes wait for the save to land.
 
 ## Git and branches
 - Local branch: `master`, tracking `origin/master` (https://github.com/NakulSiwach/AgenticTodoPersonal).
@@ -73,3 +69,4 @@ Dashboard → **Authentication → URL Configuration**:
 | Date | What |
 |------|------|
 | 2026-10-17 | Built full app, tests, PWA, CI; connected Supabase; pushed to `master` |
+| 2026-10-17 | DB + auth verified; RLS isolation and e2e tests pass; fixed fast-tap race; pushed |

@@ -110,7 +110,7 @@ export function TodoApp({ email }: { email: string }) {
           />
         )}
       </main>
-      <Composer onAdd={(input) => create.mutate(input)} />
+      <Composer onAdd={(input) => create.mutate({ ...input, id: crypto.randomUUID() })} />
       {editing && (
         <EditSheet
           key={editing.id}

@@ -31,6 +31,8 @@ export type Todo = {
 };
 
 export type NewTodo = {
+  /** Client-generated so the optimistic row keeps the same identity once saved. */
+  id: string;
   title: string;
   priority: Priority;
   notes?: string | null;

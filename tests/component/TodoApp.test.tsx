@@ -56,7 +56,7 @@ beforeEach(() => {
   vi.mocked(api.createTodo).mockImplementation(async (input) => {
     const created: Todo = {
       ...base,
-      id: "new-1",
+      id: input.id,
       title: input.title,
       priority: input.priority,
       completed: false,
@@ -113,8 +113,36 @@ describe("TodoApp", () => {
     await userEvent.type(screen.getByLabelText("New todo"), "Urgent thing");
     await userEvent.click(screen.getByRole("radio", { name: "P0" }));
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(api.createTodo).toHaveBeenCalledWith({ title: "Urgent thing", priority: 0 });
+    expect(api.createTodo).toHaveBeenCalledWith({
+      id: expect.any(String),
+      title: "Urgent thing",
+      priority: 0,
+    });
     expect(await screen.findByText("Urgent thing")).toBeInTheDocument();
+  });
+
+  it("holds an update until the todo's insert has been saved", async () => {
+    let finishInsert!: () => void;
+    vi.mocked(api.createTodo).mockImplementation(
+      (input) =>
+        new Promise((resolve) => {
+          finishInsert = () => {
+            const created = { ...base, id: input.id, title: input.title, priority: input.priority,
+              completed: false, created_at: "2026-01-03T00:00:00Z" } as Todo;
+            db = [created, ...db];
+            resolve(created);
+          };
+        }),
+    );
+    renderApp();
+    await loaded();
+    await userEvent.type(screen.getByLabelText("New todo"), "Quick one");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(await screen.findByLabelText(/Mark as done: Quick one/));
+    expect(api.updateTodo).not.toHaveBeenCalled();
+    finishInsert();
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledTimes(1));
+    expect(await screen.findByLabelText(/Mark as not done: Quick one/)).toBeChecked();
   });
 
   it("filters by status", async () => {

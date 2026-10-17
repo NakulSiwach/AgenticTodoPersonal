@@ -1,5 +1,4 @@
 import { HIGHLIGHT_COLORS, TEXT_COLORS } from "@/lib/palette";
-import { TEMP_PREFIX } from "@/lib/queries";
 import type { Priority, Todo } from "@/lib/types";
 import { PriorityBadge } from "./PriorityBadge";
 
@@ -11,7 +10,6 @@ type Props = {
 };
 
 export function TodoRow({ todo, onToggle, onOpen, onPriority }: Props) {
-  const pending = todo.id.startsWith(TEMP_PREFIX);
   const titleClasses = [
     "box-decoration-clone rounded px-1 py-0.5 break-words",
     todo.text_color ? TEXT_COLORS[todo.text_color] : "",
@@ -29,7 +27,6 @@ export function TodoRow({ todo, onToggle, onOpen, onPriority }: Props) {
         <input
           type="checkbox"
           checked={todo.completed}
-          disabled={pending}
           onChange={() => onToggle(todo)}
           aria-label={`${todo.completed ? "Mark as not done" : "Mark as done"}: ${todo.title}`}
           className="size-6 cursor-pointer accent-indigo-600"
@@ -38,7 +35,6 @@ export function TodoRow({ todo, onToggle, onOpen, onPriority }: Props) {
       <button
         type="button"
         onClick={() => onOpen(todo)}
-        disabled={pending}
         aria-label={`Edit: ${todo.title}`}
         className="min-h-11 flex-1 px-1 text-left text-base leading-snug"
       >
@@ -51,7 +47,7 @@ export function TodoRow({ todo, onToggle, onOpen, onPriority }: Props) {
       </button>
       <PriorityBadge
         priority={todo.priority}
-        onChange={pending ? undefined : (p) => onPriority(todo, p)}
+        onChange={(p) => onPriority(todo, p)}
         label={`Change priority of ${todo.title}`}
       />
     </li>
