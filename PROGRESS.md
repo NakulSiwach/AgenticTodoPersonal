@@ -13,8 +13,8 @@
 | 10 PWA | done | manifest 200, sw.js 200, icons 200, offline page 200 |
 | 11 E2E + RLS | done | `npm run e2e` 4/4 pass (Pixel 7 + Desktop Chrome); `scripts/rls-check.mjs` 10/10 pass |
 | 12 CI | written | runs on first push |
-| 13 Deploy | pending | needs user Supabase + Vercel accounts |
+| 13 Deploy | done | Vercel; live e2e 4/4 pass; HTTPS + security headers + PWA files 200 |
 | 14 Phone install | pending | user |
 
 Production build: passes with dummy env (`npm run build`).
-Live URL: _not deployed yet_
+Live URL: https://agentic-todo-personal.vercel.app
