@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>TaskFlow – offline</title>
+    <style>
+      body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 16px; text-align: center; }
+      @media (prefers-color-scheme: dark) { body { background: #0a0a0a; color: #ededed; } }
+      button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: #4f46e5; color: #fff; font-size: 16px; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You&rsquo;re offline</h1>
+      <p>TaskFlow needs a connection to load your list. Reconnect and try again.</p>
+      <button onclick="location.reload()">Retry</button>
+    </main>
+  </body>
+</html>
