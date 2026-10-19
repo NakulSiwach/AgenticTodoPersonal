@@ -47,3 +47,14 @@ Tests: 57 unit + component passing.
 | Migration `0003_profile_and_order.sql` | written, **needs running by user** | - |
 
 Tests: 94 unit + component passing.
+
+## v3 follow-up (2026-10-20)
+
+| Item | Status | Verification |
+|------|--------|--------------|
+| Instant optimistic updates (sync apply + adopt server row, no refetch on success) | done | 94/94 vitest; e2e 6/6 on four consecutive runs against a production build |
+| e2e: exact "Add" selector, click()+expect for checkboxes | done | same |
+| Migrations 0002 + 0003 applied in production | done | probed columns + `profiles` table as a signed-in test user |
+| Cron route | done | prod: 401 without/with wrong secret; local with secret → `{"checked":1,"sent":0,"skipped":1,"failed":0}` |
+| Email in production | done | owner confirmed test email works after replacing a Supabase key in `RESEND_API_KEY` |
+| Docs refresh for future agents | done | README, AGENT_INSTRUCTIONS, AGENTS.md pointer, docs/01–07, DECISIONS 13–24 |

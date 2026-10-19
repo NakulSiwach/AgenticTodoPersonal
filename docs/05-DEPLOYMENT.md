@@ -1,85 +1,99 @@
-# 05 – Deployment and Phone Access
+# 05 – Deployment, Operations and Troubleshooting
 
-Goal: a public HTTPS URL (e.g. `https://taskflow-yourname.vercel.app`) that works on your phone and can be installed like an app.
+Live: https://agentic-todo-personal.vercel.app · Repo: https://github.com/NakulSiwach/AgenticTodoPersonal
+(public, branch `master`) · Supabase project ref: `rjjchnqajfhmpivimcag`.
 
-## 1. Supabase setup (one time)
+## 1. How a change reaches production
+1. Change code locally; `npm run typecheck && npm run lint && npm test` (and `npm run e2e` for core flows).
+2. Commit and `git push` to `master`. **Vercel builds and deploys every push to `master`**
+   (1–2 min). A failed build keeps the previous version live.
+3. GitHub Actions `ci` runs lint/typecheck/test/build on the same push (it does not block Vercel).
+4. Hard-refresh the app. The service worker may serve old static files on the first load.
 
-1. supabase.com → **New project** (pick a region near you, save the DB password).
-2. **SQL Editor** → paste `supabase/migrations/0001_init.sql` → Run.
-3. **Project Settings → API**: copy **Project URL** and **anon public key**. (Never use or share the `service_role` key.)
-4. **Authentication → Providers → Email**: enabled. For a personal app, you may turn off "Confirm email" to sign in immediately.
-5. **Authentication → URL Configuration**:
-   - Site URL: your Vercel URL (set after step 3; use `http://localhost:3000` until then)
-   - Redirect URLs: `http://localhost:3000/**` and `https://<your-app>.vercel.app/**`
+The owner asked for **few pushes**: batch work and push at milestones.
 
-## 2. Local run
+## 2. Database changes
+Migrations in `supabase/migrations/` are applied **by hand** in the Supabase SQL editor
+(https://supabase.com/dashboard/project/rjjchnqajfhmpivimcag/sql/new), in numeric order.
+- Never edit an applied migration; add `000N_<name>.sql`.
+- Write them additive and re-runnable (`if not exists`, `drop … if exists` before `create policy`).
+- Apply the migration **before** pushing code that uses it. For renames/removals, do two
+  releases (add new → switch code → remove old later).
+- Applied so far: `0001_init`, `0002_features`, `0003_profile_and_order`.
 
+To check which columns exist without dashboard access, sign in as a test user with supabase-js
+and `select('<col>')`; a missing column returns a "schema cache" error.
+
+## 3. Configuration
+
+### Vercel → Project → Settings → Environment Variables
+| Name | Env | Value |
+|------|-----|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Prod + Preview | `https://rjjchnqajfhmpivimcag.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Prod + Preview | Supabase anon (public) key, `eyJ…` |
+| `NEXT_PUBLIC_SITE_URL` | Prod + Preview | `https://agentic-todo-personal.vercel.app` |
+| `RESEND_API_KEY` | Prod | Resend key, **starts with `re_`** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Prod | Supabase service_role key (`eyJ…`) or a new `sb_secret_…` key. Secret |
+| `CRON_SECRET` | Prod | long random string, identical to the GitHub secret |
+| `EMAIL_FROM` | optional | e.g. `TaskFlow <hello@yourdomain.com>`, needs a verified Resend domain |
+
+**Changing a variable does nothing until you redeploy:** Deployments → ⋯ on the latest →
+Redeploy.
+
+### GitHub → Settings → Secrets and variables → Actions
+`CRON_SECRET` (same as Vercel), `APP_URL` = `https://agentic-todo-personal.vercel.app`
+(no trailing slash).
+
+### Supabase
+- Authentication → Providers → Email: **Confirm email OFF**.
+- Authentication → URL Configuration: Site URL = the Vercel URL; redirect URLs
+  `https://agentic-todo-personal.vercel.app/**`, `http://localhost:3000/**`.
+
+### Local `.env.local` (git-ignored)
+Same names as `.env.example`. The cron secret here does **not** need to match production.
+
+## 4. Verifying production
+```bash
+B=https://agentic-todo-personal.vercel.app
+curl -s -o /dev/null -w "%{http_code}\n" $B/login            # 200
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" $B/  # 307 → /login
+curl -s $B/api/cron/digest                                    # {"error":"Unauthorized"} → route exists
+curl -sI $B/login | grep -i x-frame                           # DENY
+E2E_BASE_URL=$B E2E_EMAIL=… E2E_PASSWORD=… npm run e2e        # full browser test on prod
 ```
-cp .env.example .env.local     # fill in the 3 variables
-npm install
-npm run dev                    # http://localhost:3000
-```
+Scheduler: GitHub → Actions → Daily digest → Run workflow. Success log:
+`{"checked":N,"sent":0,"skipped":N,"failed":0}`.
+Email: Profile → Notifications → Send me a test email now.
 
-To test on the phone before deploying: connect both devices to the same Wi-Fi, run `npm run dev -- -H 0.0.0.0`, open `http://<your-PC-LAN-IP>:3000` on the phone. (Service worker / install need HTTPS, so full PWA testing happens on the deployed URL.)
+## 5. Troubleshooting (real incidents first)
 
-## 3. GitHub
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Test email: `Email provider rejected the message (401): Unsupported alg HS256; only ES256 is accepted` | `RESEND_API_KEY` in Vercel holds a **Supabase** key (`eyJ…`) | Put the `re_…` Resend key there, then **redeploy** |
+| Still the same error after fixing the variable | No redeploy since the change | Redeploy |
+| Workflow red, `curl: (22) … 401` | `CRON_SECRET` differs between GitHub and Vercel (or Vercel not redeployed) | Set the same value in both, redeploy |
+| Workflow red, `… 503` | `CRON_SECRET` or `SUPABASE_SERVICE_ROLE_KEY` missing in Vercel | Add, redeploy |
+| Workflow green but says "Set the APP_URL and CRON_SECRET…" | GitHub secrets missing | Add them |
+| Test email: Resend 403 "only send testing emails to your own email" | Using `onboarding@resend.dev` to an address other than the Resend account owner | Use the same address, or verify a domain + `EMAIL_FROM` |
+| UI: "Database needs the latest update: run …sql" | Migration not applied | Run that file in the SQL editor |
+| Everything fails, Supabase dashboard says paused | Free project idle ~7 days | Restore project |
+| Digest never arrives, test email works | Workflow disabled (60 days idle), secrets wrong, or no open tasks due today/overdue (nothing is sent then) | Check Actions tab; run it by hand |
+| Old UI after deploy | Service worker cached static files | Reload once more / reopen the app |
+| Login works locally but email links fail | URL not in Supabase redirect list | Add it (§3) |
 
-```
-git init && git add . && git commit -m "TaskFlow"
-git branch -M main
-git remote add origin https://github.com/<you>/taskflow.git
-git push -u origin main
-```
+## 6. Rollback
+Vercel → Deployments → pick a good one → ⋯ → Promote to Production. Then fix forward with a new
+commit. Database migrations are not rolled back automatically; write a new migration if needed.
 
-## 4. Vercel
+## 7. Key rotation
+- Resend: create a new key, update Vercel, redeploy, delete the old key in Resend.
+- `CRON_SECRET`: change in both Vercel and GitHub, redeploy.
+- Supabase service role: create a **secret key** (`sb_secret_…`) under Settings → API Keys →
+  Publishable and secret API keys, put it in `SUPABASE_SERVICE_ROLE_KEY`, redeploy. Disabling the
+  legacy JWT keys also disables the legacy **anon** key, so first switch
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` to a publishable key (`sb_publishable_…`), redeploy, verify, then disable.
 
-1. vercel.com → **Add New → Project** → import the GitHub repo (framework auto-detected: Next.js).
-2. **Environment Variables** (Production + Preview): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`.
-3. Deploy. Every push to `main` auto-redeploys.
-4. Copy the production URL back into Supabase **Site URL / Redirect URLs** (section 1, step 5). Redeploy if you changed `NEXT_PUBLIC_SITE_URL`.
-5. Optional: custom domain under Vercel → Settings → Domains.
-
-## 5. Install on your phone
-
-**Android (Chrome):** open the URL → sign in → menu (⋮) → *Install app* / *Add to Home screen*.
-**iPhone (Safari):** open the URL in Safari → Share → *Add to Home Screen* → Add.
-
-You will get a TaskFlow icon; it opens full-screen. Sign in once; the session persists.
-
-## 6. Verify production
-
-- [ ] `https://<url>` loads over HTTPS
-- [ ] Sign up/in works; todo created on phone shows on desktop after refresh
-- [ ] Response headers include `x-content-type-options: nosniff`
-- [ ] Lighthouse mobile: Performance >= 90, PWA installable
-
-## 7. Operations notes
-
-- **Backups:** Supabase free tier has no automatic backups; run occasionally `Table editor → Export CSV`, or add a "Export JSON" button later.
-- **Inactivity pause:** a free Supabase project pauses after about a week of no use; open the dashboard and click Restore.
-- **Rotating keys:** if the anon key leaks, it is low risk (RLS), but you can reset JWT secret in Supabase and update Vercel env vars.
-- **Rollback:** Vercel → Deployments → previous deployment → *Promote to Production*.
-- **Migrations going forward:** add `0002_*.sql` files; apply in the SQL editor (or Supabase CLI `supabase db push`).
-
-## 8. CI (GitHub Actions)
-
-`.github/workflows/ci.yml`:
-```yaml
-name: ci
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
-```
+## 8. Costs and limits (all free)
+Vercel Hobby (personal use), Supabase Free (500 MB DB; pauses when idle; no automatic backups,
+so export tables occasionally), GitHub Actions (free for public repos), Resend Free (daily and
+monthly send caps, far above one digest a day).

@@ -1,96 +1,62 @@
 # TaskFlow – Project Status (for you)
 
-_Last updated: 2026-10-17_
+_Last updated: 2026-10-20_
+
+Live app: https://agentic-todo-personal.vercel.app
 
 ## At a glance
 
 | Area | State |
 |------|-------|
-| App code (UI, auth, TODOs, priorities, colors, highlights, PWA) | ✅ Done |
-| Automated tests (30 unit + component) | ✅ Passing |
-| Typecheck, lint, production build | ✅ Passing |
-| Code on GitHub (`master`) | ✅ Pushed |
-| Supabase project connected (URL + key in `.env.local`) | ✅ Key verified working |
-| Database table `todos` created | ✅ Done, verified |
-| Email confirmation turned off | ✅ Done, verified |
-| End-to-end browser tests on your real database (phone + desktop sizes) | ✅ 4/4 passing |
-| Security check: user B can't see/change user A's data | ✅ 10/10 passing |
-| Deployed to Vercel | ✅ https://agentic-todo-personal.vercel.app |
-| Live site verified (HTTPS, security headers, PWA files, sign-in, add/complete/color/delete) | ✅ 4/4 browser tests pass against the live URL |
-| Installed on your phone | ⏳ Last step |
+| Tasks: add, complete/uncomplete, P0–P4, text colors, highlights, edit, delete + undo | ✅ Live |
+| Due dates, repeat, lists, tags, subtasks, quick-add typing, search, sort, filters | ✅ Live |
+| Drag to reorder, theme toggle, keyboard shortcuts | ✅ Live |
+| Profile: calendar, notifications, account | ✅ Live |
+| Daily email digest (test email confirmed working on 2026-10-20) | ✅ Live |
+| Database migrations 0001, 0002, 0003 | ✅ Applied |
+| Automated tests: 94 unit/component, 6 end-to-end runs (phone + desktop), security check | ✅ Passing |
+| Documentation for future agents (architecture, feature recipes, deployment, testing) | ✅ Up to date |
+| Installed on your phone | ⏳ Your step |
 
-## Your actions (in order, about 10 minutes total)
+## Still on your side
 
-### NEW – Profile, calendar, drag-to-reorder and the daily email (setup, about 10 minutes)
+1. **Install on your phone.** Android (Chrome): open the URL → ⋮ → *Install app*.
+   iPhone (Safari): Share → *Add to Home Screen*.
+2. **Check the scheduler once (if not done).** GitHub → your repo → **Actions** → **Daily digest**
+   → **Run workflow**. Green with `{"checked":…,"failed":0}` in the log = good.
+3. **Optional:** Supabase → Authentication → URL Configuration: Site URL = the live URL; redirect
+   URLs `https://agentic-todo-personal.vercel.app/**` and `http://localhost:3000/**`.
+4. **Optional clean-up:** Supabase → Authentication → Users: delete the fake test accounts
+   (`rlscheck.*@gmail.com`; keep one `e2e.*@gmail.com` if you want me to keep running browser tests).
+5. **Optional, security:** if the Supabase `service_role` key was ever pasted into the Resend
+   variable, it was sent to Resend once. To be safe, switch to a new Supabase secret key (steps in
+   `docs/05-DEPLOYMENT.md` §7). I can walk you through it.
 
-**Step A – database (1 min, required).** In the Supabase SQL editor run all of
-`supabase/migrations/0003_profile_and_order.sql` (safe to re-run). Without it, drag-to-reorder and the
-Profile settings show "Database needs the latest update".
+## Good to know
 
-**Step B – the daily email (only needed for the email feature).** Three pieces:
-1. **Email sender (Resend, free).** Create an account at https://resend.com, make an API key.
-   In Vercel → Project → Settings → Environment Variables add `RESEND_API_KEY` = that key.
-   Until you verify a domain in Resend, mail can only be delivered to the email address you
-   signed up to Resend with, so use the same address as your TaskFlow login (or verify a domain
-   and also set `EMAIL_FROM`, e.g. `TaskFlow <hello@yourdomain.com>`).
-2. **Server key for the morning job.** Supabase → Project Settings → API → copy the **service_role** key.
-   Add it in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. It is secret: server-only, never in the code or GitHub.
-   Also add `NEXT_PUBLIC_SITE_URL` = `https://agentic-todo-personal.vercel.app` (used for links in the email).
-3. **Scheduler.** Make up a long random string and add it in Vercel as `CRON_SECRET`. Then in GitHub →
-   Settings → Secrets and variables → Actions add two secrets: `CRON_SECRET` (same string) and
-   `APP_URL` (`https://agentic-todo-personal.vercel.app`, no trailing slash).
-   The workflow `.github/workflows/daily-digest.yml` then checks every 15 minutes who is due.
-4. Redeploy on Vercel (Deployments → ⋯ → Redeploy) so it picks up the variables.
+- **How changes go live:** a push to `master` on GitHub redeploys automatically in 1–2 minutes.
+  Changing a Vercel environment variable needs a manual **Redeploy**.
+- **Database changes** are SQL files you run once in the Supabase SQL editor. I'll always tell you
+  which one and when.
+- **Free-tier quirks:** Supabase pauses after ~1 week unused (click **Restore**, data is kept).
+  GitHub pauses the daily email schedule after 60 days without repo activity (Actions tab →
+  enable). The email only goes to the address you signed up to Resend with, unless you verify a
+  domain in Resend.
+- **The daily email** arrives within ~15 minutes after your chosen time, only when something is due
+  today or overdue.
+- **Secrets:** `.env.local` on this PC holds your keys and is never pushed. Never share the
+  `service_role` key, Resend key, or passwords.
 
-**Check it works:** open Profile → Notifications → **Send me a test email now**. If it fails, the red
-message says what is missing. Then turn the switch on, pick a time and Save.
+## Handing work to another AI agent
 
-### Action 0: add the v2 columns to your database (1 min, required for the v2 features)
-The redesigned app adds due dates, lists, tags, subtasks and repeating tasks. Run once:
-1. Open https://supabase.com/dashboard/project/rjjchnqajfhmpivimcag/sql/new
-2. Paste all of `supabase/migrations/0002_features.sql` and click **Run** (safe to re-run; existing tasks are untouched).
-
-Until you do, the app still loads, but saving a due date, list, tag, subtask or repeat shows
-"Database needs the latest update: run supabase/migrations/0002_features.sql".
-
-### ~~Action 1 and 2~~ - done, thank you
-
-### ~~Action 3 (Vercel)~~ - done, live at https://agentic-todo-personal.vercel.app
-
-### Action 4 – Allow your live URL in Supabase (1 min, still recommended)
-Dashboard → **Authentication → URL Configuration**:
-- Site URL: your Vercel URL
-- Redirect URLs: add `https://agentic-todo-personal.vercel.app/**` and `http://localhost:3000/**`
-(Password sign-in already works without this; it only matters for email links such as password reset or confirmation.)
-
-### Action 5 – Install on your phone
-- **Android (Chrome):** open the URL → sign up/in → ⋮ menu → *Install app*.
-- **iPhone (Safari):** open the URL → Share → *Add to Home Screen*.
-
-## What I do next
-Nothing blocking. Once you've installed it on your phone, tell me if anything feels off.
-Optional extras if you want them: export/backup button, due dates, search.
-
-## Housekeeping
-- The tests created throwaway accounts in Supabase (Authentication -> Users): `rlscheck.*@gmail.com` and `e2e.*@gmail.com`. They're fake addresses and safe to delete.
-- Bug found and fixed by the e2e tests: a very fast tap on a just-added todo could be lost. Todos now get their id on your device and later changes wait for the save to land.
-
-## Git and branches
-- Local branch: `master`, tracking `origin/master` (https://github.com/NakulSiwach/AgenticTodoPersonal).
-- I push only at milestones (pushes so far: initial, after e2e, after deploy), not on every change.
-- `.env.local` (your keys) is git-ignored and never pushed.
-
-## Security notes
-- The anon key is public by design; data is protected by Row Level Security, so each login only sees its own TODOs.
-- Never share the `service_role` key, DB password, or your Supabase/GitHub/Vercel passwords with anyone or any tool.
-- Free-tier reminder: Supabase pauses a project after ~1 week of no use. Open the dashboard and click **Restore**; data is kept.
-
-## Cost
-₹0 / $0: GitHub Free, Supabase Free, Vercel Hobby.
+Point it at the repo and say: *"Read AGENTS.md and AGENT_INSTRUCTIONS.md, then do X."* The docs
+explain the architecture, how to add features safely, how to test, and what only you can do.
 
 ## Change log
 | Date | What |
 |------|------|
-| 2026-10-17 | Built full app, tests, PWA, CI; connected Supabase; pushed to `master` |
-| 2026-10-17 | Deployed to Vercel; live site verified end to end; pushed |
-| 2026-10-17 | DB + auth verified; RLS isolation and e2e tests pass; fixed fast-tap race; pushed |
+| 2026-10-17 | v1: tasks, priorities, colors, PWA; Supabase + Vercel; tests; live |
+| 2026-10-17 | Fixed fast-tap race (client ids, writes wait for insert) |
+| 2026-10-17 | v2: redesign; due dates, repeat, lists, tags, subtasks, quick-add, search, sort |
+| 2026-10-20 | v3: profile, calendar, daily email digest, drag to reorder; email setup fixed (wrong key in `RESEND_API_KEY`) |
+| 2026-10-20 | Fixed checkbox flicker (instant optimistic updates, shipped with v3); stabilised e2e; full docs refresh |

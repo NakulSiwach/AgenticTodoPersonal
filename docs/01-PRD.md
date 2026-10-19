@@ -1,96 +1,79 @@
-# 01 – Product Requirements (PRD)
+# 01 – Product Requirements (current)
 
-## 1. Goal
+TaskFlow is a personal TODO app that works the same on phone and laptop, stores data in the
+cloud, installs to the home screen, and can email you each morning. One user per account;
+no sharing.
 
-A personal TODO app, usable on phone and desktop, with data stored in the cloud so it is the same everywhere.
+Status legend: ✅ shipped (v1 = basics, v2 = organisation, v3 = profile/email/reorder).
 
-## 2. Users
+## 1. Feature list
 
-One person (the owner). Each account sees only its own TODOs. Multiple accounts are technically supported (isolated by RLS) but there is no sharing.
+### Accounts
+- ✅ v1 Email + password sign-up and sign-in (email confirmation is off). Session persists.
+- ✅ v1 Every page except `/login` requires sign-in. Sign out from the avatar menu.
+- ✅ v3 Display name (Profile → Account), used in the email greeting.
 
-## 3. User stories and acceptance criteria
+### Tasks
+- ✅ v1 Add a task: title 1–200 chars; empty titles rejected inline. Appears instantly.
+- ✅ v1 Mark / unmark complete with a large checkbox. Finished tasks move to a "Completed" section.
+- ✅ v1 Priority **P0–P4** (P0 = urgent). Badge with text + color; checkbox ring tinted by priority.
+  Change from the row badge or the editor.
+- ✅ v1 **Text color** (8 options + default) and **highlight** (6 options + none) per task.
+  Combinations that fail WCAG contrast in light or dark mode are disabled.
+- ✅ v1 Edit everything in a sheet (bottom on phone, side panel on desktop).
+- ✅ v1 Delete with a 5-second **Undo**. "Delete all completed" in the Completed view.
+- ✅ v2 Notes (≤ 2000 chars).
+- ✅ v2 **Due date** with quick picks; colored labels (Overdue red, Today green, soon orange).
+- ✅ v2 **Repeat**: daily, weekdays, weekly, monthly, yearly. Completing a repeating task moves
+  it to its next date instead of closing it (with Undo).
+- ✅ v2 **Lists** (one per task; none = Inbox) and **tags** (≤ 10 per task, quick tag chips).
+- ✅ v2 **Subtasks** (≤ 50) with their own checkboxes and progress count.
+- ✅ v2 **Quick-add** typing: `Pay rent tomorrow !1 #Home @bills every month`.
 
-### US-1 Sign in
-As a user I can sign in with email + password (or magic link) so my list is private and synced.
-- AC1: Unauthenticated visitors are redirected to `/login`.
-- AC2: After login I land on `/` (the list).
-- AC3: Sign out is reachable from the header menu.
-- AC4: Session persists across browser restarts.
+### Finding and organising
+- ✅ v2 Views in the sidebar with counts: Inbox, Today (incl. overdue, with progress bar),
+  Upcoming, All tasks, Completed, each List, each Tag.
+- ✅ v2 Search across title, notes, list, tags and subtasks (searches all tasks, not one view).
+- ✅ v2 Sort: Priority (default), Manual order, Group by date, Due date, Newest, A–Z.
+- ✅ v2 Filter by priority.
+- ✅ v3 **Drag to reorder** (mouse, touch, keyboard). In Priority sort, only within a priority.
+- ✅ v2 Keyboard shortcuts: `n`/`q` new task, `/` search, `Esc` close.
 
-### US-2 Add a TODO
-- AC1: A fixed input bar at the bottom (thumb reachable on phone) with title field, priority picker (default P2), and Add button.
-- AC2: Empty/whitespace titles are rejected with an inline message.
-- AC3: Title max 200 chars.
-- AC4: New item appears instantly (optimistic) and persists after refresh.
+### Profile (`/profile`)
+- ✅ v3 **Calendar** tab: month grid; tasks shown on their due date (or completion day if
+  undated) as done / pending / overdue; month totals; tap a day to list its tasks.
+- ✅ v3 **Notifications** tab: daily email digest on/off, delivery time (presets or any time),
+  detected timezone, "Send me a test email now".
+- ✅ v3 **Account** tab: email (read-only), display name.
 
-### US-3 Complete / uncomplete
-- AC1: A checkbox (44px touch target) toggles completion.
-- AC2: Completed items show strikethrough and reduced opacity but keep their chosen colors visible.
-- AC3: Toggling back un-completes it (`completed_at` cleared).
-- AC4: Change is optimistic; on server error it reverts and shows a toast.
+### Daily email digest
+- ✅ v3 Once per local day, within ~15 minutes after the chosen time, email the open tasks that are
+  due today or overdue, grouped by priority. Nothing pending → no email.
+- ✅ v3 Never sent twice on the same day, even if the scheduler overlaps; failed sends retry on
+  the next run (up to 3 hours after the chosen time).
 
-### US-4 Priority
-- AC1: Priorities: **P0, P1, P2, P3, P4** (P0 = most urgent).
-- AC2: Each row shows a badge with the label text and a distinct color.
-- AC3: Priority can be changed after creation (tap badge → menu).
-- AC4: Default list order: incomplete first, then by priority ascending (P0 first), then newest first. Completed items sink to the bottom.
+### App shell
+- ✅ v1 Installable PWA (Android "Install app", iOS "Add to Home Screen"), offline page.
+- ✅ v2 Theme: System / Light / Dark toggle (top right), no flash on load.
+- ✅ v2 Responsive: fixed sidebar ≥ 768 px; slide-in menu on phones. No horizontal scroll at 360 px.
 
-### US-5 Text color
-- AC1: Per-TODO text color chosen from a fixed palette of 8 options plus "Default".
-- AC2: The palette is theme-safe (readable on light and dark backgrounds).
-- AC3: Stored as a palette key, not a raw hex.
+## 2. Non-functional requirements
+- Free to run: Vercel Hobby, Supabase Free, GitHub (public repo), Resend Free.
+- Every tap feels instant (optimistic UI); server failures roll back with a toast.
+- Data isolation by Row Level Security; service-role key only on the server.
+- Accessible: labelled controls, keyboard support, 44 px touch targets, color never the only cue.
+- Tested: unit + component (Vitest), end-to-end (Playwright, phone + desktop viewports).
 
-### US-6 Highlight
-- AC1: Per-TODO highlight (marker background behind the title text) chosen from a fixed palette of 6 options plus "None".
-- AC2: Text remains readable (contrast ratio >= 4.5:1) for every text-color x highlight combination offered; where a combo fails, the picker disables it.
+## 3. Known limits
+- Resend's shared sender only delivers to the Resend account owner's address until a domain is
+  verified. Multiple users of one deployment need a verified domain + `EMAIL_FROM`.
+- Supabase Free pauses after ~1 week idle (Restore in the dashboard; data kept).
+- GitHub disables scheduled workflows after 60 days without repo activity.
+- Offline: the app shell loads, but tasks need a connection (no offline queue).
+- No password reset UI yet (Supabase supports it; needs a page + redirect URL).
 
-### US-7 Edit and delete
-- AC1: Tap the title (or an edit icon) to edit title, notes, priority, text color, highlight in a bottom sheet.
-- AC2: Delete requires one confirmation (or offers an "Undo" toast for 5 s).
-
-### US-8 Filter and view
-- AC1: Filter chips: All / Active / Completed.
-- AC2: Priority filter: All, P0, P1, P2, P3, P4.
-- AC3: Counter shows "N active".
-
-### US-9 Installable on phone
-- AC1: Valid PWA manifest; "Add to Home Screen" works on Android Chrome and iOS Safari.
-- AC2: Opens full-screen with an app icon and theme color.
-- AC3: App shell loads offline (list requires network; shows a friendly offline message).
-
-### US-10 Dark mode
-- AC1: Follows the system preference; no manual toggle required (optional toggle allowed).
-
-## 4. Data fields per TODO
-
-| Field | Type | Rules |
-|-------|------|-------|
-| id | uuid | generated |
-| user_id | uuid | owner, from auth |
-| title | text | 1–200 chars |
-| notes | text | optional, max 2000 |
-| priority | smallint | 0–4 |
-| completed | boolean | default false |
-| completed_at | timestamptz | set when completed |
-| text_color | text | palette key or null |
-| highlight_color | text | palette key or null |
-| created_at / updated_at | timestamptz | automatic |
-
-## 5. Palettes (keys are stored in DB)
-
-Text colors: `default, red, orange, amber, green, teal, blue, purple, pink`
-Highlight colors: `none, yellow, green, blue, pink, orange, purple`
-Priority colors: P0 red, P1 orange, P2 yellow/amber, P3 blue, P4 gray.
-
-Exact CSS values live in `src/lib/palette.ts` (see Architecture §7).
-
-## 6. Non-functional requirements
-
-- Performance: first load < 2 s on 4G; Lighthouse performance >= 90, PWA and accessibility >= 90.
-- Responsive: 360px to desktop; single column max-width 640px centered.
-- Security: RLS on all tables; HTTPS only; input validated client and server side (zod + DB constraints).
-- Browser support: latest Chrome, Safari (iOS 16+), Firefox, Edge.
-
-## 7. Out of scope (do NOT build)
-
-Sharing/collaboration, due dates and reminders/push notifications, subtasks, tags/projects, drag-and-drop reordering, attachments, native apps, i18n. (Listed in the roadmap in `02-ARCHITECTURE.md` §12.)
+## 4. Ideas backlog (not built)
+Export/backup (JSON/CSV), password reset page, shared lists, reminders/push notifications, due
+*times*, natural-language dates in more forms, recurring rules like "every 2nd Tuesday", task
+archive, bulk actions, offline write queue, list colors/icons, attachments, i18n.
+See [07-ADDING-FEATURES.md](07-ADDING-FEATURES.md) for how to build them.

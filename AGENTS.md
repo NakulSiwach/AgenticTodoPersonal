@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# TaskFlow project guide
+
+Before changing anything, read `AGENT_INSTRUCTIONS.md` (rules, working loop, what only the owner
+can do), then `docs/02-ARCHITECTURE.md` (how the app works) and `docs/07-ADDING-FEATURES.md`
+(recipes). Pushing to `master` deploys production.

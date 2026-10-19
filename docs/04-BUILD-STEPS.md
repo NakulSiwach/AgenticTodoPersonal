@@ -1,3 +1,9 @@
+> **Historical document.** This is the original from-scratch plan for v1. The app has since grown
+> (v2: lists, tags, due dates, repeat, subtasks, quick-add; v3: profile, calendar, email digest,
+> reorder). For current behaviour read [02-ARCHITECTURE.md](02-ARCHITECTURE.md); to add features
+> use [07-ADDING-FEATURES.md](07-ADDING-FEATURES.md). Note: Next 16 uses `src/proxy.ts`, not
+> `middleware.ts`.
+
 # 04 – Step-by-Step Build Plan
 
 Each step: **Do** → **Verify** gate. Do not proceed until Verify passes. Commit after each step (`step N: ...`) and log in `PROGRESS.md`.

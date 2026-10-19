@@ -12,7 +12,19 @@ Deviations and judgement calls made while building, versus `docs/`.
 | 6 | Priority change on a row uses a transparent native `<select>` over the badge | Native picker on phones, accessible, no popover code |
 | 7 | Delete is deferred 5 s client-side (undo window), then really deleted | Matches PRD US-7; closing the tab inside 5 s leaves the item in place (safe failure) |
 | 8 | Playwright projects: Pixel 7 + Desktop Chrome only (no iPhone/WebKit) | Avoids a heavy WebKit download; iOS covered by manual checklist |
-| 9 | RLS two-account isolation test is a manual SQL/dashboard check, see `docs/06` | Needs two real accounts on the live project |
+| 9 | RLS isolation is tested by `scripts/rls-check.mjs` against the real DB (creates two throwaway users) rather than in CI | Needs real auth and the live policies; CI has no database |
 | 10 | Service worker caches static assets and the offline page only | Todo data needs auth and must never be served stale from cache |
 | 11 | New todos get their UUID on the client (`id` is sent on insert) instead of a temporary id | The optimistic row keeps its identity (no remount, no disabled state). Found via e2e: a fast tap could be lost during the swap |
 | 12 | Updates/deletes wait for that todo's pending insert (`pendingCreates` in `queries.ts`) | Otherwise a quick tap could update a row the server hasn't stored yet. Covered by a component test |
+| 13 | Optimistic changes are applied **synchronously** in the `mutate` wrapper, then re-applied after `cancelQueries` | Applying them only in `onMutate` (async) let a controlled checkbox snap back for a frame; found as a flaky e2e on desktop |
+| 14 | After a successful write, the server row is adopted into the cache instead of refetching the list (skipped while other writes are pending) | Refetches in flight made later taps wait a network round trip and risked stale overwrites |
+| 15 | Scheduler is GitHub Actions every 15 min, not Vercel Cron | Vercel Hobby cron runs at most once a day, which can't honour each user's chosen time. Public repo, so Actions minutes are free |
+| 16 | Digest send is "claim the day, then send; release on failure" via `profiles.last_digest_date` | GitHub runs can overlap, be late or repeat; this guarantees at most one email per local day and retries failures |
+| 17 | 3-hour send window after the chosen time (`SEND_WINDOW_MINUTES`) | GitHub cron is best-effort and can be delayed; a late run should still send |
+| 18 | Resend called with plain `fetch`, no SDK | One endpoint, no dependency |
+| 19 | Lists and tags are plain columns (`list_name`, `tags[]`), no separate tables | Single user, small data; lists appear and disappear with their tasks. Revisit if lists need colors/sharing |
+| 20 | Manual order uses a float `sort_order` with midpoints, and undragged tasks map to `-created_at` | A drop writes exactly one row; dragged and undragged tasks coexist |
+| 21 | Dark mode is class-based (`.dark` on `<html>`) with an inline pre-paint script | Allows a manual System/Light/Dark toggle without a flash |
+| 22 | Custom `Dropdown` (portal + flip) instead of native `<select>` in most places | Consistent styling in dark mode and on the bottom add bar; native select kept on the row priority badge |
+| 23 | Profiles are created lazily by upsert, with client defaults when no row exists | No sign-up trigger needed; works for accounts created before v3 |
+| 24 | e2e uses `click()` + `expect(...).toBeChecked()` instead of `check()` | `check()` asserts in the same instant as the click and flakes with React controlled inputs |
