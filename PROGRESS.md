@@ -32,3 +32,18 @@ Live URL: https://agentic-todo-personal.vercel.app
 | E2E specs updated for new UI | written, not run (needs E2E_EMAIL/E2E_PASSWORD) | typecheck only |
 
 Tests: 57 unit + component passing.
+
+## v3: profile, calendar, email digest, reorder
+
+| Item | Status | Verification |
+|------|--------|--------------|
+| Theme toggle + profile avatar menu at top right (sidebar footer removed) | done | screenshots, component test |
+| `/profile` page: Calendar, Notifications, Account tabs | done | screenshots (desktop, phone, dark), component tests |
+| Calendar: month grid, done/pending/overdue, per-day list | done | unit + screenshot |
+| Daily email digest: HTML + text, grouped by priority, per-user time + timezone, once per day | done | unit tests (build, escape, timezone window) |
+| Cron route `/api/cron/digest` (secret-protected) + GitHub Actions schedule | written | **not run end to end**: needs Resend key, service-role key, secrets |
+| "Send me a test email" button (`/api/digest/test`) | written | UI tested with a mocked response; real send needs Resend key |
+| Drag to reorder (priority order by default, Manual order option) | done | real mouse drag in browser, unit tests for ordering |
+| Migration `0003_profile_and_order.sql` | written, **needs running by user** | - |
+
+Tests: 94 unit + component passing.

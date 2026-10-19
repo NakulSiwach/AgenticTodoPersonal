@@ -1,24 +1,98 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, PartyPopper, SearchX } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ChevronRight, GripVertical, PartyPopper, SearchX } from "lucide-react";
 import type { Group } from "@/lib/views";
 import type { Priority, Todo } from "@/lib/types";
 import { TodoRow } from "./TodoRow";
 
-type Props = {
-  groups: Group[];
-  done: Todo[];
-  loading: boolean;
+type RowHandlers = {
   today: string;
   showList: boolean;
-  /** True when a search or priority filter is hiding tasks. */
-  filtered: boolean;
-  emptyHint: string;
   onToggle: (todo: Todo) => void;
   onOpen: (todo: Todo) => void;
   onPriority: (todo: Todo, p: Priority) => void;
 };
+
+type Props = RowHandlers & {
+  groups: Group[];
+  done: Todo[];
+  loading: boolean;
+  /** True when a search or priority filter is hiding tasks. */
+  filtered: boolean;
+  emptyHint: string;
+  /** Show drag handles on open tasks. */
+  draggable: boolean;
+  onReorder: (activeId: string, overId: string) => void;
+};
+
+function SortableRow({ todo, ...handlers }: RowHandlers & { todo: Todo }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: todo.id });
+  return (
+    <TodoRow
+      todo={todo}
+      {...handlers}
+      liRef={setNodeRef}
+      liStyle={{ transform: CSS.Transform.toString(transform), transition }}
+      dragging={isDragging}
+      dragHandle={
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          aria-label={`Reorder: ${todo.title}`}
+          title="Drag to reorder"
+          className="grid size-11 w-7 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-neutral-300 hover:text-neutral-600 active:cursor-grabbing dark:text-neutral-600 dark:hover:text-neutral-300"
+        >
+          <GripVertical size={16} aria-hidden="true" />
+        </button>
+      }
+    />
+  );
+}
+
+function SortableGroup({
+  todos,
+  onReorder,
+  ...handlers
+}: RowHandlers & { todos: Todo[]; onReorder: (activeId: string, overId: string) => void }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
+  };
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={todos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <ul>
+          {todos.map((t) => (
+            <SortableRow key={t.id} todo={t} {...handlers} />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
+  );
+}
 
 export function TodoList({
   groups,
@@ -28,6 +102,8 @@ export function TodoList({
   showList,
   filtered,
   emptyHint,
+  draggable,
+  onReorder,
   onToggle,
   onOpen,
   onPriority,
@@ -44,7 +120,7 @@ export function TodoList({
     );
   }
 
-  const rowProps = { today, showList, onToggle, onOpen, onPriority };
+  const rowProps: RowHandlers = { today, showList, onToggle, onOpen, onPriority };
   const empty = groups.length === 0 && done.length === 0;
 
   if (empty) {
@@ -76,11 +152,15 @@ export function TodoList({
               </span>
             </h3>
           )}
-          <ul>
-            {g.todos.map((t) => (
-              <TodoRow key={t.id} todo={t} {...rowProps} />
-            ))}
-          </ul>
+          {draggable ? (
+            <SortableGroup todos={g.todos} onReorder={onReorder} {...rowProps} />
+          ) : (
+            <ul>
+              {g.todos.map((t) => (
+                <TodoRow key={t.id} todo={t} {...rowProps} />
+              ))}
+            </ul>
+          )}
         </section>
       ))}
       {done.length > 0 && (

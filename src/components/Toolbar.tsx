@@ -3,8 +3,10 @@ import { ArrowUpDown, ChevronDown, Flag, Menu, Search, X } from "lucide-react";
 import { priorityOptions } from "@/lib/options";
 import type { PriorityFilter, SortKey } from "@/lib/types";
 import { Dropdown, type DropdownOption } from "./Dropdown";
+import { TopActions } from "./ProfileMenu";
 
 type Props = {
+  email: string;
   title: string;
   subtitle: string;
   progress: { done: number; total: number } | null;
@@ -18,9 +20,10 @@ type Props = {
 };
 
 const SORTS: DropdownOption<SortKey>[] = [
-  { value: "smart", label: "Smart (by date)" },
+  { value: "priority", label: "Priority (default)" },
+  { value: "manual", label: "Manual order" },
+  { value: "smart", label: "Group by date" },
   { value: "due", label: "Due date" },
-  { value: "priority", label: "Priority" },
   { value: "newest", label: "Newest first" },
   { value: "alpha", label: "A to Z" },
 ];
@@ -34,7 +37,7 @@ const trigger =
   "inline-flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 sm:flex-none sm:min-w-40 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800";
 
 export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
-  { title, subtitle, progress, search, sort, priority, onSearch, onSort, onPriority, onMenu },
+  { email, title, subtitle, progress, search, sort, priority, onSearch, onSort, onPriority, onMenu },
   searchRef,
 ) {
   const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -58,6 +61,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
                 {subtitle}
               </p>
             </div>
+            <TopActions email={email} />
           </div>
           {progress && progress.total > 0 && (
             <div

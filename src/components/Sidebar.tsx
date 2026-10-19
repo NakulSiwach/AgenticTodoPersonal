@@ -9,21 +9,17 @@ import {
   Inbox,
   LayoutList,
   ListTodo,
-  LogOut,
   Plus,
   Tag,
 } from "lucide-react";
 import { listNameSchema } from "@/lib/schema";
 import { listView, tagView, type Counts } from "@/lib/views";
 import type { ViewKey } from "@/lib/types";
-import { ThemeToggle } from "./ThemeToggle";
 
 type Props = {
   view: ViewKey;
   counts: Counts;
-  email: string;
   onView: (v: ViewKey) => void;
-  onSignOut: () => void;
 };
 
 function Item({
@@ -69,7 +65,7 @@ function Item({
   );
 }
 
-export function Sidebar({ view, counts, email, onView, onSignOut }: Props) {
+export function Sidebar({ view, counts, onView }: Props) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -168,24 +164,6 @@ export function Sidebar({ view, counts, email, onView, onSignOut }: Props) {
           </div>
         )}
       </nav>
-
-      <div className="flex items-center gap-1 border-t border-neutral-200 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] dark:border-neutral-800">
-        <div className="min-w-0 flex-1 px-2">
-          <p className="truncate text-xs text-neutral-500 dark:text-neutral-400" title={email}>
-            {email}
-          </p>
-        </div>
-        <ThemeToggle />
-        <button
-          type="button"
-          onClick={onSignOut}
-          aria-label="Sign out"
-          title="Sign out"
-          className="grid size-11 place-items-center rounded-xl text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800"
-        >
-          <LogOut size={20} aria-hidden="true" />
-        </button>
-      </div>
     </div>
   );
 }

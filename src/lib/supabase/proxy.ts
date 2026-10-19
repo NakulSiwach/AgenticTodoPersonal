@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/login", "/auth"];
+// /api/cron authenticates itself with CRON_SECRET (a scheduler has no login session).
+const PUBLIC_PREFIXES = ["/login", "/auth", "/api/cron"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

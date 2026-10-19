@@ -12,6 +12,11 @@ type Props = {
   onToggle: (todo: Todo) => void;
   onOpen: (todo: Todo) => void;
   onPriority: (todo: Todo, p: Priority) => void;
+  /** Drag handle shown at the start of the row (only when reordering is possible). */
+  dragHandle?: React.ReactNode;
+  liRef?: React.Ref<HTMLLIElement>;
+  liStyle?: React.CSSProperties;
+  dragging?: boolean;
 };
 
 const TONES: Record<DueTone, string> = {
@@ -23,7 +28,18 @@ const TONES: Record<DueTone, string> = {
 
 const meta = "inline-flex items-center gap-1";
 
-export function TodoRow({ todo, today, showList, onToggle, onOpen, onPriority }: Props) {
+export function TodoRow({
+  todo,
+  today,
+  showList,
+  onToggle,
+  onOpen,
+  onPriority,
+  dragHandle,
+  liRef,
+  liStyle,
+  dragging,
+}: Props) {
   const titleClasses = [
     "box-decoration-clone rounded px-1 py-0.5 break-words",
     todo.text_color ? TEXT_COLORS[todo.text_color] : "",
@@ -39,10 +55,13 @@ export function TodoRow({ todo, today, showList, onToggle, onOpen, onPriority }:
 
   return (
     <li
+      ref={liRef}
+      style={liStyle}
       className={`group flex items-start gap-1 rounded-xl px-1 py-0.5 transition-colors hover:bg-white dark:hover:bg-neutral-900 ${
         todo.completed ? "opacity-60" : ""
-      }`}
+      } ${dragging ? "relative z-10 bg-white shadow-lg ring-1 ring-indigo-500/40 dark:bg-neutral-900" : ""}`}
     >
+      {dragHandle}
       <label className="relative grid size-11 shrink-0 cursor-pointer place-items-center">
         <input
           type="checkbox"

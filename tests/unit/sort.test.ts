@@ -18,6 +18,7 @@ function todo(id: string, priority: Priority, completed: boolean, created: strin
     tags: [],
     subtasks: [],
     repeat: null,
+    sort_order: null,
     created_at: created,
     updated_at: created,
   };

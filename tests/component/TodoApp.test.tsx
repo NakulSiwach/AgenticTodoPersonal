@@ -6,7 +6,10 @@ import { ToastProvider } from "@/components/Toast";
 import { TodoApp } from "@/components/TodoApp";
 import type { Subtask, Todo } from "@/lib/types";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/",
+}));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ auth: { signOut: vi.fn() } }) }));
 vi.mock("@/lib/todos", () => ({
   listTodos: vi.fn(),
@@ -28,6 +31,7 @@ const base = {
   tags: [] as string[],
   subtasks: [] as Subtask[],
   repeat: null,
+  sort_order: null,
   updated_at: "2026-01-01T00:00:00Z",
 } as const;
 
@@ -252,6 +256,33 @@ describe("TodoApp", () => {
     await userEvent.click(screen.getByRole("button", { name: "Quick-add tips" }));
     expect(screen.getByText(/#ListName puts the task in that list/)).toBeInTheDocument();
     expect(screen.getByText(/@tag adds a label/)).toBeInTheDocument();
+  });
+
+  it("orders by priority by default and shows drag handles", async () => {
+    renderApp();
+    await loaded();
+    expect(screen.getByRole("button", { name: "Sort by" })).toHaveTextContent("Priority (default)");
+    expect(screen.getByRole("button", { name: "Reorder: Write report" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reorder: Buy milk" })).toBeInTheDocument();
+  });
+
+  it("hides drag handles when sorted another way and in the Completed view", async () => {
+    renderApp();
+    await loaded();
+    await userEvent.click(screen.getByRole("button", { name: "Sort by" }));
+    await userEvent.click(screen.getByRole("option", { name: "A to Z" }));
+    expect(screen.queryByRole("button", { name: /^Reorder:/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sort by" }));
+    await userEvent.click(screen.getByRole("option", { name: "Manual order" }));
+    expect(screen.getByRole("button", { name: "Reorder: Write report" })).toBeInTheDocument();
+  });
+
+  it("has the theme toggle and profile menu in the top bar", async () => {
+    renderApp();
+    await loaded();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("button", { name: /theme/i })).toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: "Profile menu" })).toBeInTheDocument();
   });
 
   it("searches across all tasks", async () => {

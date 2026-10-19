@@ -31,6 +31,7 @@ export const listNameSchema = z.string().trim().min(1).max(40, "List name is too
 export const tagSchema = z.string().trim().min(1).max(30, "Tag is too long");
 export const tagsSchema = z.array(tagSchema).max(10, "At most 10 tags");
 export const repeatSchema = z.enum(REPEATS).nullable();
+export const sortOrderSchema = z.number().finite().nullable();
 export const subtasksSchema = z
   .array(z.object({ id: z.string().min(1), title: titleSchema, done: z.boolean() }))
   .max(50, "At most 50 subtasks");
@@ -62,5 +63,6 @@ export const todoPatchSchema = z
     tags: tagsSchema,
     subtasks: subtasksSchema,
     repeat: repeatSchema,
+    sort_order: sortOrderSchema,
   })
   .partial();

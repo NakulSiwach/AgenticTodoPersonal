@@ -102,3 +102,34 @@ export const REPEAT_LABELS: Record<Repeat, string> = {
   monthly: "Every month",
   yearly: "Every year",
 };
+
+/** Wall-clock date and minutes since midnight for `now` in an IANA timezone (UTC if unknown). */
+export function localClock(now: Date, timeZone: string): { date: string; minutes: number } {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
+  let fmt: Intl.DateTimeFormat;
+  try {
+    fmt = new Intl.DateTimeFormat("en-CA", { ...options, timeZone });
+  } catch {
+    fmt = new Intl.DateTimeFormat("en-CA", { ...options, timeZone: "UTC" });
+  }
+  const parts = fmt.formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  return {
+    date: `${get("year")}-${get("month")}-${get("day")}`,
+    minutes: Number(get("hour")) * 60 + Number(get("minute")),
+  };
+}
+
+/** `HH:MM` or `HH:MM:SS` to minutes since midnight (NaN if malformed). */
+export function parseClockTime(time: string): number {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time);
+  if (!m) return NaN;
+  return Number(m[1]) * 60 + Number(m[2]);
+}

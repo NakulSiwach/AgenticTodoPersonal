@@ -13,6 +13,7 @@ export function normalizeTodo(row: Partial<Todo> & Record<string, unknown>): Tod
     tags: row.tags ?? [],
     subtasks: row.subtasks ?? [],
     repeat: row.repeat ?? null,
+    sort_order: row.sort_order ?? null,
   };
 }
 

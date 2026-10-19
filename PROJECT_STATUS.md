@@ -21,7 +21,31 @@ _Last updated: 2026-10-17_
 
 ## Your actions (in order, about 10 minutes total)
 
-### NEW – Action 0: add the v2 columns to your database (1 min, required for the new features)
+### NEW – Profile, calendar, drag-to-reorder and the daily email (setup, about 10 minutes)
+
+**Step A – database (1 min, required).** In the Supabase SQL editor run all of
+`supabase/migrations/0003_profile_and_order.sql` (safe to re-run). Without it, drag-to-reorder and the
+Profile settings show "Database needs the latest update".
+
+**Step B – the daily email (only needed for the email feature).** Three pieces:
+1. **Email sender (Resend, free).** Create an account at https://resend.com, make an API key.
+   In Vercel → Project → Settings → Environment Variables add `RESEND_API_KEY` = that key.
+   Until you verify a domain in Resend, mail can only be delivered to the email address you
+   signed up to Resend with, so use the same address as your TaskFlow login (or verify a domain
+   and also set `EMAIL_FROM`, e.g. `TaskFlow <hello@yourdomain.com>`).
+2. **Server key for the morning job.** Supabase → Project Settings → API → copy the **service_role** key.
+   Add it in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. It is secret: server-only, never in the code or GitHub.
+   Also add `NEXT_PUBLIC_SITE_URL` = `https://agentic-todo-personal.vercel.app` (used for links in the email).
+3. **Scheduler.** Make up a long random string and add it in Vercel as `CRON_SECRET`. Then in GitHub →
+   Settings → Secrets and variables → Actions add two secrets: `CRON_SECRET` (same string) and
+   `APP_URL` (`https://agentic-todo-personal.vercel.app`, no trailing slash).
+   The workflow `.github/workflows/daily-digest.yml` then checks every 15 minutes who is due.
+4. Redeploy on Vercel (Deployments → ⋯ → Redeploy) so it picks up the variables.
+
+**Check it works:** open Profile → Notifications → **Send me a test email now**. If it fails, the red
+message says what is missing. Then turn the switch on, pick a time and Save.
+
+### Action 0: add the v2 columns to your database (1 min, required for the v2 features)
 The redesigned app adds due dates, lists, tags, subtasks and repeating tasks. Run once:
 1. Open https://supabase.com/dashboard/project/rjjchnqajfhmpivimcag/sql/new
 2. Paste all of `supabase/migrations/0002_features.sql` and click **Run** (safe to re-run; existing tasks are untouched).

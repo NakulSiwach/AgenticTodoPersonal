@@ -21,6 +21,7 @@ function todo(id: string, over: Partial<Todo> = {}): Todo {
     tags: [],
     subtasks: [],
     repeat: null,
+    sort_order: null,
     created_at: "2026-10-01T00:00:00Z",
     updated_at: "2026-10-01T00:00:00Z",
     ...over,

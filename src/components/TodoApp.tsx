@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { formatDue, nextOccurrence, today as todayISO } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/client";
+import { formatDue, nextOccurrence } from "@/lib/dates";
+import { useToday } from "@/lib/useToday";
+import { orderAfterMove } from "@/lib/order";
 import { useCreateTodo, useDeleteTodo, useTodos, useUpdateTodo } from "@/lib/queries";
 import type { Priority, PriorityFilter, SortKey, Todo, TodoPatch, ViewKey } from "@/lib/types";
 import {
@@ -25,21 +24,6 @@ import { TodoList } from "./TodoList";
 
 const UNDO_WINDOW_MS = 5000;
 
-/** Local "today", refreshed so the app stays right when left open past midnight. */
-function useToday(): string {
-  const [day, setDay] = useState(() => todayISO());
-  useEffect(() => {
-    const tick = () => setDay(todayISO());
-    const id = setInterval(tick, 60_000);
-    document.addEventListener("visibilitychange", tick);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", tick);
-    };
-  }, []);
-  return day;
-}
-
 const EMPTY_HINTS: Record<string, string> = {
   inbox: "Your inbox is empty. Add a task below to get started.",
   today: "Nothing due today. Enjoy it, or add a task for today.",
@@ -58,8 +42,6 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 export function TodoApp({ email }: { email: string }) {
-  const router = useRouter();
-  const qc = useQueryClient();
   const { data, isLoading, isError, error, refetch } = useTodos();
   const create = useCreateTodo();
   const update = useUpdateTodo();
@@ -68,7 +50,7 @@ export function TodoApp({ email }: { email: string }) {
   const today = useToday();
 
   const [view, setView] = useState<ViewKey>("all");
-  const [sort, setSort] = useState<SortKey>("smart");
+  const [sort, setSort] = useState<SortKey>("priority");
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -123,13 +105,6 @@ export function TodoApp({ email }: { email: string }) {
     setMenuOpen(false);
   };
 
-  const signOut = async () => {
-    await createClient().auth.signOut();
-    qc.clear();
-    router.replace("/login");
-    router.refresh();
-  };
-
   const toggle = (t: Todo) => {
     // Finishing a repeating task schedules its next occurrence instead of closing it.
     if (!t.completed && t.repeat && t.due_date) {
@@ -151,6 +126,23 @@ export function TodoApp({ email }: { email: string }) {
         onAction: () => patch(t.id, { completed: false }),
       });
     }
+  };
+
+  // Dragging is available when the order is priority-based or manual, on open tasks only.
+  const canDrag = (sort === "priority" || sort === "manual") && view !== "completed" && !searching;
+  const reorder = (activeId: string, overId: string) => {
+    const list = groups[0]?.todos ?? [];
+    const active = list.find((t) => t.id === activeId);
+    const over = list.find((t) => t.id === overId);
+    if (!active || !over) return;
+    if (sort === "priority" && active.priority !== over.priority) {
+      toast.push({
+        message: "In priority order you can reorder within the same priority. Change the priority, or switch to Manual order.",
+      });
+      return;
+    }
+    const next = orderAfterMove(list, activeId, overId);
+    if (next !== null) patch(activeId, { sort_order: next });
   };
 
   const add = (input: ComposerInput) => create.mutate({ ...input, id: crypto.randomUUID() });
@@ -209,7 +201,7 @@ export function TodoApp({ email }: { email: string }) {
   }, [editingId]);
 
   const sidebar = (
-    <Sidebar view={view} counts={counts} email={email} onView={changeView} onSignOut={signOut} />
+    <Sidebar view={view} counts={counts} onView={changeView} />
   );
 
   return (
@@ -235,6 +227,7 @@ export function TodoApp({ email }: { email: string }) {
       <div className="min-w-0 flex-1">
         <Toolbar
           ref={searchRef}
+          email={email}
           title={searching ? "Search results" : viewTitle(view)}
           subtitle={subtitle}
           progress={progress}
@@ -283,6 +276,8 @@ export function TodoApp({ email }: { email: string }) {
                 onToggle={toggle}
                 onOpen={(t) => setEditingId(t.id)}
                 onPriority={(t, p: Priority) => patch(t.id, { priority: p })}
+                draggable={canDrag}
+                onReorder={reorder}
               />
               {view === "completed" && done.length > 0 && (
                 <button

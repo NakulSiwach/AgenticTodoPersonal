@@ -29,19 +29,19 @@ test("add, prioritise, complete, uncomplete, colour and delete a todo", async ({
   await page.getByLabel("New todo").fill(title);
   await page.getByRole("button", { name: "Priority", exact: true }).click();
   await page.getByRole("option", { name: "P0", exact: true }).click();
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   const row = page.getByRole("listitem").filter({ hasText: title });
   await expect(row).toBeVisible();
   await expect(row).toContainText("P0");
 
   // Finished tasks move into the "Completed" section at the bottom (open by default).
-  await row.getByRole("checkbox").check();
+  await row.getByRole("checkbox").click();
   await expect(page.getByRole("region", { name: "Completed tasks" })).toContainText(title);
   await expect(page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox")).toBeChecked();
   await page.reload();
   await expect(page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox")).toBeChecked();
 
-  await page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox").uncheck();
+  await page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox").click();
   await expect(page.getByRole("listitem").filter({ hasText: title }).getByRole("checkbox")).not.toBeChecked();
 
   await page.getByRole("button", { name: `Edit: ${title}` }).click();

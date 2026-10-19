@@ -1,4 +1,5 @@
 import { diffDays, formatLongDate, toISODate } from "./dates";
+import { byOrder, byPriorityThenOrder } from "./order";
 import { compareTodos } from "./sort";
 import type { PriorityFilter, SortKey, Todo, ViewKey } from "./types";
 
@@ -72,7 +73,8 @@ const byDue = (a: Todo, b: Todo) =>
 
 const SORTERS: Record<Exclude<SortKey, "smart">, (a: Todo, b: Todo) => number> = {
   due: byDue,
-  priority: compareTodos,
+  priority: byPriorityThenOrder,
+  manual: byOrder,
   newest: (a, b) => b.created_at.localeCompare(a.created_at),
   alpha: (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }),
 };
@@ -94,7 +96,7 @@ export function groupOpen(todos: Todo[], sort: SortKey, today: string): Group[] 
     buckets.set(g.key, bucket);
   }
   const groups = [...buckets.values()].sort((a, b) => a.order - b.order);
-  for (const g of groups) g.todos.sort(g.key === "overdue" ? byDue : compareTodos);
+  for (const g of groups) g.todos.sort(g.key === "overdue" ? byDue : byPriorityThenOrder);
   // A single undated group needs no heading.
   if (groups.length === 1 && groups[0].key === "none") groups[0].label = null;
   return groups;

@@ -38,6 +38,8 @@ export type Todo = {
   tags: string[];
   subtasks: Subtask[];
   repeat: Repeat | null;
+  /** Manual position (smaller = earlier). Null means the default order. */
+  sort_order: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -71,10 +73,19 @@ export type TodoPatch = Partial<
     | "tags"
     | "subtasks"
     | "repeat"
+    | "sort_order"
   >
 >;
 
 export type PriorityFilter = "all" | Priority;
-export type SortKey = "smart" | "due" | "priority" | "newest" | "alpha";
+export type SortKey = "priority" | "manual" | "smart" | "due" | "newest" | "alpha";
+
+export type Profile = {
+  display_name: string | null;
+  email_digest_enabled: boolean;
+  /** Local time, `HH:MM`. */
+  email_digest_time: string;
+  timezone: string;
+};
 /** `inbox | today | upcoming | all | completed`, `list:<name>` or `tag:<name>`. */
 export type ViewKey = string;
