@@ -118,6 +118,9 @@ export default function LoginPage() {
       >
         {mode === "signin" ? "No account? Create one" : "Have an account? Sign in"}
       </button>
+      <a href="/privacy" className="mt-2 text-xs text-neutral-500 underline dark:text-neutral-400">
+        Privacy policy
+      </a>
     </main>
   );
 }

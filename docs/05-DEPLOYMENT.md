@@ -56,7 +56,9 @@ Redeploy.
 1. https://console.cloud.google.com → project picker → **New project** (e.g. "TaskFlow").
 2. **APIs & Services → Library** → "Google Calendar API" → **Enable**.
 3. **Google Auth Platform** (OAuth consent screen) → Get started: app name `TaskFlow`, your
-   email, audience **External**.
+   email, audience **External**. Branding: home page `https://agentic-todo-personal.vercel.app`,
+   privacy policy `https://agentic-todo-personal.vercel.app/privacy`, authorized domain
+   `agentic-todo-personal.vercel.app`.
 4. **Data access → Add or remove scopes** → add
    `https://www.googleapis.com/auth/calendar.app.created` (plus `openid`, `.../auth/userinfo.email`) → Save.
 5. **Audience → Publish app** (status "In production"). In "Testing" status Google expires the

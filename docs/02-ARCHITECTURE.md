@@ -42,6 +42,7 @@ Key choices:
 | `/` | `src/app/page.tsx` → `TodoApp` | Server component that renders a client app | Redirects to `/login` if no user |
 | `/profile` | `src/app/profile/page.tsx` → `ProfileApp` | Same | Same |
 | `/login` | `src/app/login/page.tsx` | Client component | Public; signed-in users are bounced to `/` |
+| `/privacy` | `src/app/privacy/page.tsx` | Static page | Public. Privacy policy linked from Google's OAuth consent screen; update it when data handling changes |
 | `/auth/callback` | `src/app/auth/callback/route.ts` | Route handler | Public; exchanges an email-link `code` for a session |
 | `/api/digest/test` | `src/app/api/digest/test/route.ts` | `POST` | Signed-in user (cookie). Uses the **anon** client, so RLS applies |
 | `/api/cron/digest` | `src/app/api/cron/digest/route.ts` | `GET` | `Authorization: Bearer $CRON_SECRET` (constant-time compare). Public in the proxy |
@@ -57,7 +58,7 @@ Key choices:
 `src/proxy.ts` (Next 16's name for middleware) runs on every non-static request:
 it refreshes the Supabase session cookie and redirects anonymous users to `/login`.
 Public prefixes live in `PUBLIC_PREFIXES` in `src/lib/supabase/proxy.ts`
-(`/login`, `/auth`, `/api/cron`). **A new public route must be added there**, or it will
+(`/login`, `/auth`, `/api/cron`, `/privacy`). **A new public route must be added there**, or it will
 redirect to `/login`.
 
 ## 3. Folder map

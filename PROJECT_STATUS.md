@@ -36,7 +36,11 @@ isn't set up.
 5. **Permission.** Google Auth Platform → **Data access** → **Add or remove scopes** → in "Manually
    add scopes" paste `https://www.googleapis.com/auth/calendar.app.created` → Add to table → also
    tick `openid` and `.../auth/userinfo.email` → Update → **Save**.
-6. **Publish it.** Google Auth Platform → **Audience** → **Publish app** → Confirm. (If you skip
+6. **Branding.** Google Auth Platform → **Branding**: Application home page
+   `https://agentic-todo-personal.vercel.app`, Privacy policy link
+   `https://agentic-todo-personal.vercel.app/privacy`, Authorized domains → Add domain
+   `agentic-todo-personal.vercel.app` → **Save**.
+   **Publish it.** Google Auth Platform → **Audience** → **Publish app** → Confirm. (If you skip
    this, Google disconnects you every 7 days.) Google won't review it; that's fine for your own use.
 7. **Create the login client.** Google Auth Platform → **Clients** → **Create client** → type
    **Web application**, name `TaskFlow web` → under **Authorized redirect URIs** add both:
