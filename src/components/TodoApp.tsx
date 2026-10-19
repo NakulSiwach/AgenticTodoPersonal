@@ -21,6 +21,9 @@ import { Sidebar } from "./Sidebar";
 import { Toolbar } from "./Toolbar";
 import { useToast } from "./Toast";
 import { TodoList } from "./TodoList";
+import { RemindersPanel, TodayReminders } from "./RemindersPanel";
+import { useReminders } from "@/lib/reminderQueries";
+import { dueOn } from "@/lib/reminders";
 
 const UNDO_WINDOW_MS = 5000;
 
@@ -71,6 +74,8 @@ export function TodoApp({ email }: { email: string }) {
     [data, pendingDelete],
   );
   const counts = useMemo(() => countViews(all, today), [all, today]);
+  const { data: reminders } = useReminders();
+  const remindersToday = useMemo(() => dueOn(reminders ?? [], today).length, [reminders, today]);
   const listNames = useMemo(() => counts.lists.map((l) => l.name), [counts.lists]);
   const tagNames = useMemo(() => counts.tags.map((t) => t.name), [counts.tags]);
   const searching = search.trim().length > 0;
@@ -90,7 +95,10 @@ export function TodoApp({ email }: { email: string }) {
 
   const editing = all.find((t) => t.id === editingId) ?? null;
   const progress = view === "today" && !searching ? todayProgress(all, today) : null;
-  const subtitle = progress
+  const showReminders = view === "reminders" && !searching;
+  const subtitle = showReminders
+    ? `${reminders?.length ?? 0} reminders · ${remindersToday} today`
+    : progress
     ? `${progress.done} of ${progress.total} done`
     : `${open.length} active${done.length ? ` · ${done.length} completed` : ""}`;
 
@@ -201,7 +209,7 @@ export function TodoApp({ email }: { email: string }) {
   }, [editingId]);
 
   const sidebar = (
-    <Sidebar view={view} counts={counts} onView={changeView} />
+    <Sidebar view={view} counts={counts} remindersToday={remindersToday} onView={changeView} />
   );
 
   return (
@@ -240,53 +248,62 @@ export function TodoApp({ email }: { email: string }) {
           onMenu={() => setMenuOpen(true)}
         />
         <main className="mx-auto max-w-3xl px-4 pt-4 pb-60 md:pb-16">
-          <Composer
-            ref={composerRef}
-            onAdd={add}
-            today={today}
-            defaultDue={view === "today" ? today : null}
-            defaultList={view.startsWith("list:") ? view.slice(5) : null}
-            lists={listNames}
-            knownTags={tagNames}
-          />
-          {isError ? (
-            <div role="alert" className="py-8 text-center">
-              <p className="mb-3 text-red-600 dark:text-red-400">
-                Couldn&apos;t load your todos{error instanceof Error ? `: ${error.message}` : ""}.
-              </p>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="min-h-11 rounded-xl bg-indigo-600 px-5 font-semibold text-white"
-              >
-                Retry
-              </button>
-            </div>
+          {showReminders ? (
+            <RemindersPanel today={today} />
           ) : (
             <>
-              <TodoList
-                key={`${view}|${searching}`}
-                groups={groups}
-                done={done}
-                loading={isLoading}
+              <Composer
+                ref={composerRef}
+                onAdd={add}
                 today={today}
-                showList={!view.startsWith("list:")}
-                filtered={searching || priority !== "all"}
-                emptyHint={EMPTY_HINTS[view] ?? "Add a task below to put it in this list."}
-                onToggle={toggle}
-                onOpen={(t) => setEditingId(t.id)}
-                onPriority={(t, p: Priority) => patch(t.id, { priority: p })}
-                draggable={canDrag}
-                onReorder={reorder}
+                defaultDue={view === "today" ? today : null}
+                defaultList={view.startsWith("list:") ? view.slice(5) : null}
+                lists={listNames}
+                knownTags={tagNames}
               />
-              {view === "completed" && done.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearCompleted}
-                  className="mt-4 min-h-11 rounded-xl border border-red-600 px-4 text-sm font-semibold text-red-600 dark:border-red-400 dark:text-red-400"
-                >
-                  Delete all completed
-                </button>
+              {view === "today" && !searching && (
+                <TodayReminders today={today} onOpen={() => changeView("reminders")} />
+              )}
+              {isError ? (
+                <div role="alert" className="py-8 text-center">
+                  <p className="mb-3 text-red-600 dark:text-red-400">
+                    Couldn&apos;t load your todos{error instanceof Error ? `: ${error.message}` : ""}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="min-h-11 rounded-xl bg-indigo-600 px-5 font-semibold text-white"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <TodoList
+                    key={`${view}|${searching}`}
+                    groups={groups}
+                    done={done}
+                    loading={isLoading}
+                    today={today}
+                    showList={!view.startsWith("list:")}
+                    filtered={searching || priority !== "all"}
+                    emptyHint={EMPTY_HINTS[view] ?? "Add a task below to put it in this list."}
+                    onToggle={toggle}
+                    onOpen={(t) => setEditingId(t.id)}
+                    onPriority={(t, p: Priority) => patch(t.id, { priority: p })}
+                    draggable={canDrag}
+                    onReorder={reorder}
+                  />
+                  {view === "completed" && done.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearCompleted}
+                      className="mt-4 min-h-11 rounded-xl border border-red-600 px-4 text-sm font-semibold text-red-600 dark:border-red-400 dark:text-red-400"
+                    >
+                      Delete all completed
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}

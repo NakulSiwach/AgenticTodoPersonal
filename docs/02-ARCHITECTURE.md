@@ -378,3 +378,49 @@ deploy, the first load may show old static files; a second load picks up the new
 | `E2E_EMAIL`, `E2E_PASSWORD`, `E2E_BASE_URL` | shell only | Playwright | for e2e |
 
 Vercel only applies changed variables on a **new deployment**.
+
+## 16. Reminders and the quote of the day (migration 0005)
+
+**What:** short recurring notes ("Take medicines", "Gym on Mon/Wed/Fri") that appear in the app on
+the days they're due and are listed at the top of that morning's email. A hand-picked quote can
+close the email.
+
+**Files**
+| File | Role |
+|------|------|
+| `supabase/migrations/0005_reminders_and_quotes.sql` | `reminders` table + RLS; `profiles.digest_quote_enabled` (default true) |
+| `src/lib/reminders.ts` | types, zod schema, `cleanReminder`, `isDueOn`/`dueOn`, `nextDueDate`, `describeSchedule`, `sortReminders` (pure, unit-tested) |
+| `src/lib/reminderApi.ts` | supabase-js list / upsert / delete; friendly "run 0005" error |
+| `src/lib/reminderQueries.ts` | TanStack hooks `useReminders`, `useSaveReminder().save`, `useDeleteReminder().remove` (sync optimistic apply, rollback + toast) |
+| `src/components/RemindersPanel.tsx` | `RemindersPanel` (the Reminders view: add form with idea chips, Due today, All reminders with pause/edit/delete+undo) and `TodayReminders` (card on the Today view) |
+| `src/lib/quotes.ts` | ~90 curated, attributed quotes; `quoteForDate(date)` |
+| `src/lib/digestExtras.ts` | server: `loadDigestExtras(db, {today, quoteEnabled, userId?})` → `{reminders, quote}` |
+
+**Table `public.reminders`:** `id` (client UUID), `user_id` (default `auth.uid()`), `text` 1–200,
+`schedule` ∈ `daily | weekdays | weekly | monthly | yearly | once`, `days_of_week smallint[]`
+(0 = Sunday; required non-empty for weekly), `on_date date` (required for monthly/yearly/once),
+`active` (pause), timestamps. RLS: own rows only, all four verbs. `cleanReminder` stores only
+the fields the schedule uses.
+
+**Schedule rules (`isDueOn`):** weekdays = Mon–Fri; weekly = listed days; monthly = day of
+`on_date`, clamped to the month's last day (31st → 30 Apr); yearly = month + day of `on_date`
+(29 Feb → 28 Feb in non-leap years); once = exactly `on_date`; paused = never. Dates are the
+user's local dates (server uses the profile timezone, like the digest).
+
+**UI:** view key `reminders` (sidebar item with a count of today's reminders). In that view
+`TodoApp` renders `RemindersPanel` instead of the composer and task list (a search still shows
+tasks). The Today view shows `TodayReminders` above the tasks.
+
+**Email:** both `/api/cron/digest` and `/api/digest/test` call `loadDigestExtras` and pass
+`reminders` + `quote` to `buildDigest`. Reminders come first (amber box), then tasks by priority,
+then "Thought for the day". Subject: `2 tasks + 1 reminder for today (1 overdue) · <date>`. The
+cron job now also sends when there are **only** reminders; with neither tasks nor reminders it
+stays quiet. If the `reminders` table is missing (0005 not applied), the email is still sent
+without them. Quote shown unless `digest_quote_enabled = false` (toggle in Profile →
+Notifications; the field is only written when changed, so saving works before 0005).
+
+**Quotes:** local list (no API: no rate limits, no outage, no generic filler). Only
+well-attributed quotes; misattributed classics are deliberately excluded. `quoteForDate` walks
+the list with a stride co-prime to its length: same quote for everyone on a date, every quote
+once per cycle, consecutive days jump between authors. To add quotes, append to `QUOTES` (keep
+attribution accurate; the unit test rejects duplicates).

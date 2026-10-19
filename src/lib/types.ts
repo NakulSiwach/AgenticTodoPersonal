@@ -82,6 +82,8 @@ export type SortKey = "priority" | "manual" | "smart" | "due" | "newest" | "alph
 
 export type Profile = {
   display_name: string | null;
+  /** Quote of the day at the bottom of the daily email. */
+  digest_quote_enabled: boolean;
   email_digest_enabled: boolean;
   /** Local time, `HH:MM`. */
   email_digest_time: string;

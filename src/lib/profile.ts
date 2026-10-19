@@ -9,6 +9,7 @@ export const PROFILE_KEY = ["profile"] as const;
 
 export const DEFAULT_PROFILE: Profile = {
   display_name: null,
+  digest_quote_enabled: true,
   email_digest_enabled: false,
   email_digest_time: "08:00",
   timezone: "UTC",
@@ -18,6 +19,7 @@ export const profilePatchSchema = z
   .object({
     display_name: z.string().trim().min(1, "Name can't be empty").max(60, "Name is too long").nullable(),
     email_digest_enabled: z.boolean(),
+    digest_quote_enabled: z.boolean(),
     email_digest_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a valid time"),
     timezone: z.string().min(1).max(64),
   })
@@ -33,7 +35,9 @@ export function browserTimezone(): string {
 
 function fail(message: string): never {
   if (/schema cache|does not exist/i.test(message)) {
-    throw new Error("Database needs the latest update: run supabase/migrations/0003_profile_and_order.sql");
+    throw new Error(
+      "Database needs the latest update: run the newest files in supabase/migrations (0003 and later) in the Supabase SQL editor",
+    );
   }
   throw new Error(message);
 }
@@ -44,6 +48,7 @@ function normalize(row: Row | null): Profile {
   if (!row) return DEFAULT_PROFILE;
   return {
     display_name: row.display_name ?? null,
+    digest_quote_enabled: row.digest_quote_enabled ?? true,
     email_digest_enabled: row.email_digest_enabled ?? false,
     // Postgres returns "08:00:00"; the UI works with "08:00".
     email_digest_time: (row.email_digest_time ?? "08:00").slice(0, 5),

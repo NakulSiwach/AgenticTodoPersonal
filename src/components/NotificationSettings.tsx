@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Send } from "lucide-react";
+import { Mail, Quote as QuoteIcon, Send } from "lucide-react";
 import { browserTimezone, useProfile, useSaveProfile } from "@/lib/profile";
+import { quoteForDate } from "@/lib/quotes";
+import { useToday } from "@/lib/useToday";
 import type { Profile } from "@/lib/types";
 import { useToast } from "./Toast";
 
@@ -20,12 +22,16 @@ function Form({ profile }: { profile: Profile }) {
   const timezone = browserTimezone();
   const [enabled, setEnabled] = useState(profile.email_digest_enabled);
   const [time, setTime] = useState(profile.email_digest_time);
+  const [quote, setQuote] = useState(profile.digest_quote_enabled);
+  const today = useToday();
+  const todaysQuote = quoteForDate(today);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const dirty =
     enabled !== profile.email_digest_enabled ||
     time !== profile.email_digest_time ||
+    quote !== profile.digest_quote_enabled ||
     (enabled && timezone !== profile.timezone);
 
   const onSave = (e: React.FormEvent) => {
@@ -35,7 +41,13 @@ function Form({ profile }: { profile: Profile }) {
       return;
     }
     save.mutate(
-      { email_digest_enabled: enabled, email_digest_time: time, timezone },
+      {
+        email_digest_enabled: enabled,
+        email_digest_time: time,
+        timezone,
+        // Only sent when changed, so saving still works before migration 0005 is applied.
+        ...(quote !== profile.digest_quote_enabled ? { digest_quote_enabled: quote } : {}),
+      },
       {
         onSuccess: () =>
           toast.push({
@@ -55,11 +67,19 @@ function Form({ profile }: { profile: Profile }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timezone }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string; to?: string; count?: number };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        to?: string;
+        count?: number;
+        reminders?: number;
+      };
       if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+      const reminders = body.reminders ?? 0;
       setTestResult({
         ok: true,
-        message: `Sent to ${body.to}. It lists ${body.count ?? 0} task${body.count === 1 ? "" : "s"} due today or overdue. Check your inbox (and spam).`,
+        message: `Sent to ${body.to}. It lists ${body.count ?? 0} task${body.count === 1 ? "" : "s"} due today or overdue${
+          reminders ? ` and ${reminders} reminder${reminders === 1 ? "" : "s"}` : ""
+        }. Check your inbox (and spam).`,
       });
     } catch (e) {
       setTestResult({ ok: false, message: (e as Error).message });
@@ -79,8 +99,8 @@ function Form({ profile }: { profile: Profile }) {
             Daily email digest
           </p>
           <p id="digest-help" className="mt-0.5 text-sm text-neutral-600 dark:text-neutral-400">
-            Every morning we email everything due today or overdue, with the highest priority first. If nothing is
-            pending, no email is sent.
+            Every morning we email everything due today or overdue, with the highest priority first, plus your
+            reminders for the day. If there&apos;s nothing to send, no email is sent.
           </p>
         </div>
         <button
@@ -135,6 +155,50 @@ function Form({ profile }: { profile: Profile }) {
         </p>
       </fieldset>
 
+      <fieldset disabled={!enabled} className={`space-y-3 ${enabled ? "" : "opacity-50"}`}>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p id="quote-label" className="text-sm font-medium">
+              Add a thought for the day
+            </p>
+            <p id="quote-help" className="text-xs text-neutral-500 dark:text-neutral-400">
+              A hand-picked quote at the end of the email, from thinkers like Seneca, Feynman and Frankl. A new one
+              each day.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={quote}
+            aria-labelledby="quote-label"
+            aria-describedby="quote-help"
+            onClick={() => setQuote((v) => !v)}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+              quote ? "bg-indigo-600" : "bg-neutral-300 dark:bg-neutral-700"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow transition-transform ${
+                quote ? "translate-x-5" : ""
+              }`}
+            />
+          </button>
+        </div>
+        {quote && (
+          <figure aria-label="Today's quote" className="rounded-xl border-l-4 border-indigo-500 bg-indigo-50/60 px-4 py-3 dark:bg-indigo-500/10">
+            <QuoteIcon size={16} aria-hidden="true" className="mb-1 text-indigo-500" />
+            <blockquote className="text-sm text-neutral-800 italic dark:text-neutral-200">
+              &ldquo;{todaysQuote.text}&rdquo;
+            </blockquote>
+            <figcaption className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+              — {todaysQuote.author}
+              {todaysQuote.source ? <>, <cite>{todaysQuote.source}</cite></> : null}
+            </figcaption>
+          </figure>
+        )}
+      </fieldset>
+
       <div className="flex flex-wrap gap-2">
         <button
           type="submit"
@@ -183,7 +247,7 @@ export function NotificationSettings() {
   // Keyed on the saved values so the form re-syncs after a save.
   return (
     <Form
-      key={`${data!.email_digest_enabled}|${data!.email_digest_time}|${data!.timezone}`}
+      key={`${data!.email_digest_enabled}|${data!.email_digest_time}|${data!.timezone}|${data!.digest_quote_enabled}`}
       profile={data!}
     />
   );

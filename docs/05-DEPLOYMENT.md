@@ -97,3 +97,9 @@ commit. Database migrations are not rolled back automatically; write a new migra
 Vercel Hobby (personal use), Supabase Free (500 MB DB; pauses when idle; no automatic backups,
 so export tables occasionally), GitHub Actions (free for public repos), Resend Free (daily and
 monthly send caps, far above one digest a day).
+
+## 9. Migration 0005 (reminders + quote)
+Run `supabase/migrations/0005_reminders_and_quotes.sql` in the SQL editor. It is independent of
+0004 (Google Calendar), so either can go first. Until it runs, the Reminders view shows "Database
+needs the latest update", the email is sent without reminders, and the quote setting can't be
+changed (the quote is on by default).

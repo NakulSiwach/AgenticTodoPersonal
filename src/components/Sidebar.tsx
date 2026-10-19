@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  Bell,
   CalendarClock,
   CalendarDays,
   CheckCircle2,
@@ -19,6 +20,8 @@ import type { ViewKey } from "@/lib/types";
 type Props = {
   view: ViewKey;
   counts: Counts;
+  /** Reminders due today (badge on the Reminders item). */
+  remindersToday?: number;
   onView: (v: ViewKey) => void;
 };
 
@@ -65,7 +68,7 @@ function Item({
   );
 }
 
-export function Sidebar({ view, counts, onView }: Props) {
+export function Sidebar({ view, counts, remindersToday, onView }: Props) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +103,7 @@ export function Sidebar({ view, counts, onView }: Props) {
           <Item active={view === "upcoming"} icon={<CalendarClock size={icon} />} label="Upcoming" count={counts.upcoming} onClick={() => onView("upcoming")} />
           <Item active={view === "all"} icon={<LayoutList size={icon} />} label="All tasks" count={counts.all} onClick={() => onView("all")} />
           <Item active={view === "completed"} icon={<CheckCircle2 size={icon} />} label="Completed" onClick={() => onView("completed")} />
+          <Item active={view === "reminders"} icon={<Bell size={icon} />} label="Reminders" count={remindersToday} onClick={() => onView("reminders")} />
         </div>
 
         <div>

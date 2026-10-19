@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { buildDigest, shouldSendDigest, type DigestTodo } from "@/lib/digest";
+import { loadDigestExtras } from "@/lib/digestExtras";
 import { appBaseUrl, sendEmail } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -23,6 +24,8 @@ type ProfileRow = {
   email_digest_time: string;
   timezone: string;
   last_digest_date: string | null;
+  /** Missing until migration 0005 is applied; treated as on. */
+  digest_quote_enabled?: boolean;
 };
 
 export async function GET(request: Request) {
@@ -88,16 +91,24 @@ export async function GET(request: Request) {
         .lte("due_date", today);
       if (todoError) throw new Error(todoError.message);
 
-      if (!todos || todos.length === 0) {
-        result.skipped++; // nothing pending: stay quiet
+      const extras = await loadDigestExtras(admin, {
+        today,
+        userId: p.user_id,
+        quoteEnabled: p.digest_quote_enabled !== false,
+      });
+
+      if ((!todos || todos.length === 0) && extras.reminders.length === 0) {
+        result.skipped++; // nothing pending and nothing to remember: stay quiet
         continue;
       }
 
       const digest = buildDigest({
         name: p.display_name ?? "",
-        todos: todos.map((t) => ({ ...t, tags: t.tags ?? [], subtasks: t.subtasks ?? [] })) as DigestTodo[],
+        todos: (todos ?? []).map((t) => ({ ...t, tags: t.tags ?? [], subtasks: t.subtasks ?? [] })) as DigestTodo[],
         today,
         appUrl: appBaseUrl(),
+        reminders: extras.reminders,
+        quote: extras.quote,
       });
       await sendEmail({ to: email, subject: digest.subject, html: digest.html, text: digest.text });
       result.sent++;

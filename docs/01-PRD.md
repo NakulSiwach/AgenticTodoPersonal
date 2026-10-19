@@ -77,3 +77,13 @@ Export/backup (JSON/CSV), password reset page, shared lists, reminders/push noti
 *times*, natural-language dates in more forms, recurring rules like "every 2nd Tuesday", task
 archive, bulk actions, offline write queue, list colors/icons, attachments, i18n.
 See [07-ADDING-FEATURES.md](07-ADDING-FEATURES.md) for how to build them.
+
+## 5. Reminders and daily quote (v4)
+- ✅ v4 **Reminders** section (sidebar): short text reminders with a schedule: every day,
+  weekdays, specific days of the week, monthly on a day, yearly on a date, or once on a date.
+  One-tap ideas (medicines, gym, water plants…). Pause/resume, edit, delete with Undo.
+- ✅ v4 Today's reminders appear on the Today view and at the **top of the daily email** (same
+  email as tasks, not a separate one). The email is also sent on days with reminders but no tasks.
+- ✅ v4 **Thought for the day**: a curated, attributed quote (Stoics, Feynman, Frankl, Munger,
+  Clear, …) at the bottom of the email; on by default, toggle in Profile → Notifications with a
+  preview of today's quote.

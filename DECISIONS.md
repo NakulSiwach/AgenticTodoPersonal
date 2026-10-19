@@ -28,3 +28,8 @@ Deviations and judgement calls made while building, versus `docs/`.
 | 22 | Custom `Dropdown` (portal + flip) instead of native `<select>` in most places | Consistent styling in dark mode and on the bottom add bar; native select kept on the row priority badge |
 | 23 | Profiles are created lazily by upsert, with client defaults when no row exists | No sign-up trigger needed; works for accounts created before v3 |
 | 24 | e2e uses `click()` + `expect(...).toBeChecked()` instead of `check()` | `check()` asserts in the same instant as the click and flakes with React controlled inputs |
+| 25 | Reminders are their own table, not tasks with a flag | No completion state, different schedule shapes (days of week, monthly day), shouldn't clutter task views or counts |
+| 26 | Reminders live in the same daily email (top section); email also goes out with reminders only | Owner asked for one email; a day with only "take medicines" still deserves a nudge |
+| 27 | Quotes are a curated local list, not a quotes API | Free APIs return generic or misattributed quotes, rate-limit, and add an outage point to the email. Deterministic per date |
+| 28 | `digest_quote_enabled` is only sent on save when changed | Saving digest settings keeps working before migration 0005 is applied |
+| 29 | Built on branch `feature/reminders-quotes` in a separate worktree, migration numbered 0005 | Another agent was working on Google Calendar (0004) in the main folder at the same time |

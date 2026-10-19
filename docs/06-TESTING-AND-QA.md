@@ -51,3 +51,11 @@ which is faster and closer to what users get than dev mode.
 
 ## 5. Definition of done
 See [07-ADDING-FEATURES.md §10](07-ADDING-FEATURES.md#10-definition-of-done-for-a-feature).
+
+## 6. Reminders and quotes (v4)
+Unit: `reminders.test.ts` (every schedule incl. month-end and leap-day clamping, next date,
+descriptions, schema, sorting), `quotes.test.ts` (collection sanity, deterministic full cycle,
+author spread), `digestReminders.test.ts` (sections, order, subject, escaping). Component:
+`RemindersPanel.test.tsx` (add weekly, validation, ideas, pause, edit, delete + undo, rollback,
+load error, Today card), `QuoteSetting.test.tsx`. E2E: `e2e/reminders.spec.ts`. RLS:
+`scripts/rls-check.mjs` covers `reminders`.

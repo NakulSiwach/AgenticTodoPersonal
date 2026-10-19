@@ -16,6 +16,7 @@ export function viewTitle(view: ViewKey): string {
       upcoming: "Upcoming",
       all: "All tasks",
       completed: "Completed",
+      reminders: "Reminders",
     }[view] ?? "Tasks"
   );
 }

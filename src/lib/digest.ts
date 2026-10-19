@@ -1,5 +1,6 @@
 import { diffDays, localClock, parseClockTime } from "./dates";
 import { PRIORITY_HINTS } from "./palette";
+import type { Quote } from "./quotes";
 import type { Priority, Todo } from "./types";
 
 export type DigestTodo = Pick<
@@ -14,9 +15,20 @@ export type DigestInput = {
   /** The recipient's local date, `YYYY-MM-DD`. */
   today: string;
   appUrl: string;
+  /** Texts of the reminders due today, listed above the tasks. */
+  reminders?: string[];
+  /** Quote of the day, shown at the bottom when set. */
+  quote?: Quote | null;
 };
 
-export type Digest = { subject: string; html: string; text: string; count: number; overdue: number };
+export type Digest = {
+  subject: string;
+  html: string;
+  text: string;
+  count: number;
+  overdue: number;
+  reminderCount: number;
+};
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -79,17 +91,24 @@ function metaParts(t: DigestTodo, today: string): { text: string; overdue: boole
   return out;
 }
 
-export function buildDigest({ name, todos, today, appUrl }: DigestInput): Digest {
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+export function buildDigest({ name, todos, today, appUrl, reminders = [], quote = null }: DigestInput): Digest {
   const sorted = sortDigest(todos);
   const overdue = sorted.filter((t) => t.due_date !== null && diffDays(t.due_date, today) < 0).length;
   const count = sorted.length;
+  const reminderCount = reminders.length;
   const base = appUrl.replace(/\/$/, "");
   const greeting = `Good morning${name ? `, ${name}` : ""}`;
 
+  // e.g. "2 tasks + 1 reminder for today (1 overdue) · Sat, 3 Jan 2026"
+  const parts: string[] = [];
+  if (count > 0) parts.push(plural(count, "task"));
+  if (reminderCount > 0) parts.push(plural(reminderCount, "reminder"));
   const subject =
-    count === 0
+    parts.length === 0
       ? `Nothing due today · ${longDate(today)}`
-      : `${count} ${count === 1 ? "task" : "tasks"} for today${overdue ? ` (${overdue} overdue)` : ""} · ${longDate(today)}`;
+      : `${parts.join(" + ")} for today${overdue ? ` (${overdue} overdue)` : ""} · ${longDate(today)}`;
 
   const groups = ([0, 1, 2, 3, 4] as Priority[])
     .map((p) => ({ p, items: sorted.filter((t) => t.priority === p) }))
@@ -97,8 +116,13 @@ export function buildDigest({ name, todos, today, appUrl }: DigestInput): Digest
 
   // ---- plain text ----
   const lines: string[] = [`${greeting}!`, ""];
+  if (reminderCount > 0) {
+    lines.push(`Reminders for today (${reminderCount})`);
+    for (const r of reminders) lines.push(`  • ${r}`);
+    lines.push("");
+  }
   if (count === 0) {
-    lines.push("You have nothing due today. Enjoy the free time.");
+    lines.push(reminderCount > 0 ? "No tasks due today." : "You have nothing due today. Enjoy the free time.", "");
   } else {
     lines.push(
       `You have ${count} pending ${count === 1 ? "task" : "tasks"} for today${overdue ? `, ${overdue} overdue` : ""}.`,
@@ -112,6 +136,9 @@ export function buildDigest({ name, todos, today, appUrl }: DigestInput): Digest
       }
       lines.push("");
     }
+  }
+  if (quote) {
+    lines.push(`"${quote.text}"`, `  — ${quote.author}${quote.source ? `, ${quote.source}` : ""}`, "");
   }
   lines.push(`Open TaskFlow: ${base}`, "", `Change the time or turn this email off: ${base}/profile`);
   const text = lines.join("\n");
@@ -150,9 +177,35 @@ export function buildDigest({ name, todos, today, appUrl }: DigestInput): Digest
     })
     .join("\n");
 
+  const remindersHtml =
+    reminderCount === 0
+      ? ""
+      : `<tr><td style="padding:18px 24px 0 24px;">
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 16px;">
+    <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px;">&#128276; Reminders for today</div>
+    ${reminders
+      .map((r) => `<div style="font-size:14px;line-height:22px;color:#78350f;">&bull;&nbsp; ${escapeHtml(r)}</div>`)
+      .join("\n    ")}
+  </div>
+</td></tr>`;
+
+  const quoteHtml = quote
+    ? `<tr><td style="padding:26px 24px 0 24px;">
+  <div style="border-left:3px solid #6366f1;padding:4px 0 4px 14px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;color:#6366f1;text-transform:uppercase;margin-bottom:6px;">Thought for the day</div>
+    <div style="font-size:15px;line-height:23px;color:#374151;font-style:italic;">&ldquo;${escapeHtml(quote.text)}&rdquo;</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:6px;">&mdash; ${escapeHtml(quote.author)}${
+      quote.source ? `, <span style="font-style:italic;">${escapeHtml(quote.source)}</span>` : ""
+    }</div>
+  </div>
+</td></tr>`
+    : "";
+
   const summary =
     count === 0
-      ? "You have nothing due today. Enjoy the free time."
+      ? reminderCount > 0
+        ? "No tasks due today."
+        : "You have nothing due today. Enjoy the free time."
       : `You have <strong>${count}</strong> pending ${count === 1 ? "task" : "tasks"} for today${
           overdue ? `, <strong style="color:#dc2626;">${overdue} overdue</strong>` : ""
         }. Highest priority first.`;
@@ -172,7 +225,9 @@ export function buildDigest({ name, todos, today, appUrl }: DigestInput): Digest
     <div style="font-size:18px;font-weight:600;color:#111827;">${escapeHtml(greeting)}!</div>
     <div style="font-size:14px;line-height:21px;color:#4b5563;margin-top:6px;">${summary}</div>
   </td></tr>
+  ${remindersHtml}
   ${groupHtml}
+  ${quoteHtml}
   <tr><td align="center" style="padding:28px 24px 8px 24px;">
     <a href="${escapeHtml(base)}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 28px;border-radius:10px;">Open TaskFlow</a>
   </td></tr>
@@ -188,7 +243,7 @@ export function buildDigest({ name, todos, today, appUrl }: DigestInput): Digest
 </body>
 </html>`;
 
-  return { subject, html, text, count, overdue };
+  return { subject, html, text, count, overdue, reminderCount };
 }
 
 /** How long after the chosen time a late scheduler run may still send that day's email. */

@@ -47,6 +47,29 @@ check("B cannot insert a row owned by A", !!spoofErr, spoofErr?.code);
 const { data: aAfter } = await a.c.from("todos").select("*").eq("id", row.id).single();
 check("A's todo is intact", aAfter?.title === "A private todo");
 
+// reminders (migration 0005): same isolation as todos.
+const { data: rem, error: remErr } = await a.c
+  .from("reminders")
+  .insert({ text: "A private reminder", schedule: "daily" })
+  .select()
+  .single();
+if (remErr?.code === "PGRST205") {
+  check("reminders table exists", false, "run migration 0005");
+} else {
+  check("A can add a reminder", !remErr && rem?.user_id === a.id, remErr?.message);
+  const { data: bRem } = await b.c.from("reminders").select("*");
+  check("B cannot read A's reminders", bRem?.length === 0, `rows=${bRem?.length}`);
+  const { data: bRemUpd } = await b.c.from("reminders").update({ text: "hacked" }).eq("id", rem.id).select();
+  check("B cannot update A's reminder", (bRemUpd?.length ?? 0) === 0);
+  const { data: bRemDel } = await b.c.from("reminders").delete().eq("id", rem.id).select();
+  check("B cannot delete A's reminder", (bRemDel?.length ?? 0) === 0);
+  const { error: badWeekly } = await a.c.from("reminders").insert({ text: "x", schedule: "weekly" });
+  check("DB rejects weekly reminder without days", !!badWeekly, badWeekly?.code);
+  const { error: badOnce } = await a.c.from("reminders").insert({ text: "x", schedule: "once" });
+  check("DB rejects one-off reminder without a date", !!badOnce, badOnce?.code);
+  await a.c.from("reminders").delete().eq("id", rem.id);
+}
+
 const { error: badPri } = await a.c.from("todos").insert({ title: "bad", priority: 9 });
 check("DB rejects priority 9", !!badPri, badPri?.code);
 const { error: badColor } = await a.c.from("todos").insert({ title: "bad", text_color: "neon" });

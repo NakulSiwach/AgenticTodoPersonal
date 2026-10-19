@@ -1,5 +1,6 @@
 import { buildDigest, type DigestTodo } from "@/lib/digest";
 import { localClock } from "@/lib/dates";
+import { loadDigestExtras } from "@/lib/digestExtras";
 import { appBaseUrl, EmailNotConfiguredError, sendEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,8 +21,13 @@ export async function POST(request: Request) {
     /* no body: fall back to UTC */
   }
 
-  const { data: profile } = await supabase.from("profiles").select("display_name").maybeSingle();
+  // `*` rather than named columns, so a missing newer column (un-applied migration) can't break it.
+  const { data: profile } = await supabase.from("profiles").select("*").maybeSingle();
   const today = localClock(new Date(), timezone).date;
+  const extras = await loadDigestExtras(supabase, {
+    today,
+    quoteEnabled: profile?.digest_quote_enabled !== false,
+  });
 
   const { data: todos, error } = await supabase
     .from("todos")
@@ -35,6 +41,8 @@ export async function POST(request: Request) {
     todos: (todos ?? []).map((t) => ({ ...t, tags: t.tags ?? [], subtasks: t.subtasks ?? [] })) as DigestTodo[],
     today,
     appUrl: appBaseUrl(),
+    reminders: extras.reminders,
+    quote: extras.quote,
   });
 
   try {
@@ -48,5 +56,5 @@ export async function POST(request: Request) {
     const status = e instanceof EmailNotConfiguredError ? 503 : 502;
     return Response.json({ error: (e as Error).message }, { status });
   }
-  return Response.json({ ok: true, to: user.email, count: digest.count });
+  return Response.json({ ok: true, to: user.email, count: digest.count, reminders: digest.reminderCount });
 }
