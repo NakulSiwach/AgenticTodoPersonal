@@ -1,20 +1,10 @@
-import { timingSafeEqual } from "node:crypto";
+import { authorizedCron as authorized } from "@/lib/cronAuth";
 import { buildDigest, shouldSendDigest, type DigestTodo } from "@/lib/digest";
 import { appBaseUrl, sendEmail } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Called every ~15 minutes by a scheduler (.github/workflows/daily-digest.yml).
 // For each user whose chosen time has just passed, emails today's pending tasks once per day.
-
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const given = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 type ProfileRow = {
   user_id: string;

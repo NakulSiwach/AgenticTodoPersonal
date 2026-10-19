@@ -15,21 +15,24 @@ fix this file in the same change.
                           │  /auth/callback    email-link code exchange   │
                           │  /api/digest/test  "send me a test email"     │
                           │  /api/cron/digest  morning email job          │
+                          │  /api/gcal/*       Google Calendar connect/sync│
+                          │  /api/cron/gcal    Google Calendar re-sync job │
                           └───────┬───────────────────────────┬───────────┘
                                   │ anon key + user JWT        │ service-role key (server only)
        browser also talks         ▼                            ▼
        to Supabase directly ─► Supabase: Auth + Postgres (RLS on every table)
                                                                │
- GitHub Actions (every 15 min) ── GET /api/cron/digest ────────┘
-   Authorization: Bearer CRON_SECRET          └──► Resend HTTP API ──► user's inbox
+ GitHub Actions (every 15 min) ── GET /api/cron/digest ────────┤──► Resend HTTP API ──► inbox
+   Authorization: Bearer CRON_SECRET  GET /api/cron/gcal ──────┘──► Google Calendar API
 ```
 
 Key choices:
 - **No custom CRUD API.** The browser reads and writes `todos` and `profiles` directly with
   `supabase-js` and the user's JWT. **Row Level Security is the authorization layer.**
-- **Server code exists only where a secret is needed:** the email routes. Only
-  `/api/cron/digest` uses the service-role key (bypasses RLS), and it authenticates the caller
-  with `CRON_SECRET` first.
+- **Server code exists only where a secret is needed:** the email and Google Calendar routes.
+  The service-role key (bypasses RLS) is used by the two cron routes (after the `CRON_SECRET`
+  check) and by `/api/gcal/*` (after `getUser()` from the caller's cookies, always scoped to that
+  user's id).
 - **Optimistic UI everywhere.** Every tap updates the screen at once; the network catches up.
 
 ## 2. Routes
@@ -42,6 +45,12 @@ Key choices:
 | `/auth/callback` | `src/app/auth/callback/route.ts` | Route handler | Public; exchanges an email-link `code` for a session |
 | `/api/digest/test` | `src/app/api/digest/test/route.ts` | `POST` | Signed-in user (cookie). Uses the **anon** client, so RLS applies |
 | `/api/cron/digest` | `src/app/api/cron/digest/route.ts` | `GET` | `Authorization: Bearer $CRON_SECRET` (constant-time compare). Public in the proxy |
+| `/api/gcal` | `src/app/api/gcal/route.ts` | `GET` | Signed-in user. Connection status (`GcalStatus`), never the token |
+| `/api/gcal/connect` | `…/gcal/connect/route.ts` | `GET` (navigation) | Signed-in user. Sets a `state` cookie, redirects to Google consent |
+| `/api/gcal/callback` | `…/gcal/callback/route.ts` | `GET` (from Google) | Signed-in user + matching `state` cookie. Stores token, creates calendar, first sync, → `/profile?gcal=…` |
+| `/api/gcal/sync` | `…/gcal/sync/route.ts` | `POST` | Signed-in user. Full reconcile, returns counts + status |
+| `/api/gcal/disconnect` | `…/gcal/disconnect/route.ts` | `POST {removeCalendar}` | Signed-in user. Optional calendar delete, revoke, forget |
+| `/api/cron/gcal` | `src/app/api/cron/gcal/route.ts` | `GET` | `CRON_SECRET` bearer. Re-syncs every connected user |
 | `/manifest.webmanifest`, `/icon.png`, `/apple-icon.png` | `src/app/manifest.ts`, `src/app/*.png` | Metadata routes | Public |
 | `/sw.js`, `/offline.html`, `/icons/*` | `public/` | Static | Public |
 
@@ -64,6 +73,8 @@ src/
     auth/callback/route.ts     code → session
     api/digest/test/route.ts   test email for the signed-in user
     api/cron/digest/route.ts   scheduled morning digest for everyone due
+    api/gcal/…                 Google Calendar: status, connect, callback, sync, disconnect
+    api/cron/gcal/route.ts     scheduled Google Calendar re-sync (safety net)
     manifest.ts error.tsx not-found.tsx icon.png apple-icon.png
   components/
     Providers.tsx              QueryClient + ToastProvider + service-worker registration
@@ -80,6 +91,7 @@ src/
     ProfileApp.tsx             /profile: header card + tabs
     CalendarView.tsx           month grid, done/pending/overdue, per-day list
     NotificationSettings.tsx   digest on/off, time, timezone, "send test email"
+    GoogleCalendarSettings.tsx Google Calendar card (Calendar tab): connect, status, sync now, disconnect
     AccountSettings.tsx        display name
     ProfileMenu.tsx            avatar menu (Tasks, Profile, Sign out) + TopActions (theme + avatar)
     ThemeToggle.tsx            system / light / dark
@@ -97,6 +109,11 @@ src/
     calendar.ts                month grid + stats for the calendar tab
     digest.ts                  email subject/HTML/text builder + "is it time to send?" rule
     email.ts                   Resend HTTP call; appBaseUrl()
+    gcalEvents.ts              pure: task → Google event, fingerprint, planSync() diff
+    google.ts                  SERVER ONLY: OAuth, token encryption, Calendar API, syncUser()
+    gcalRoute.ts               SERVER ONLY: helpers for /api/gcal routes (signed-in user, link row, status)
+    gcalClient.ts              client: status hook, sync/disconnect calls, debounced auto-sync
+    cronAuth.ts                CRON_SECRET bearer check shared by the cron routes
     palette.ts                 color keys → Tailwind classes, contrast check, priority styles
     options.ts                 dropdown options, quick tag suggestions
     theme.ts                   theme persistence + pre-paint script
@@ -104,8 +121,8 @@ src/
     supabase/client.ts         browser client (singleton, anon key)
     supabase/server.ts         server-component client (cookies)
     supabase/proxy.ts          proxy session logic + PUBLIC_PREFIXES
-    supabase/admin.ts          SERVICE-ROLE client: server only, cron route only
-supabase/migrations/           0001_init, 0002_features, 0003_profile_and_order (apply in order)
+    supabase/admin.ts          SERVICE-ROLE client: server only (cron routes, /api/gcal routes)
+supabase/migrations/           0001_init, 0002_features, 0003_profile_and_order, 0004_google_calendar (in order)
 scripts/                       gen-icons.mjs (PWA icons), rls-check.mjs (two-account security test)
 public/                        sw.js, offline.html, icons/
 tests/unit, tests/component    Vitest (+ Testing Library)        e2e/   Playwright
@@ -154,11 +171,26 @@ One row per user, created lazily by **upsert** the first time settings are saved
 | `timezone` | IANA name from the browser, e.g. `Asia/Calcutta` |
 | `last_digest_date` | local date of the last digest sent (once-a-day guard) |
 
+### `public.google_calendar_links` (0004)
+
+One row per user who connected Google Calendar. **Server only:** RLS on, no policies, and
+`revoke all … from anon, authenticated`, so the browser can't read or write it even for its own
+user. The `/api/gcal` routes read it with the service-role client after authenticating the user.
+
+| Column | Notes |
+|--------|-------|
+| `user_id` PK | FK `auth.users`, on delete cascade |
+| `google_email` | which Google account is linked (from the OAuth id_token), display only |
+| `calendar_id` | the secondary "TaskFlow" calendar the app created |
+| `refresh_token_enc` | AES-256-GCM ciphertext `v1.<iv>.<tag>.<data>`, key = sha256(`GOOGLE_TOKEN_KEY`) |
+| `last_synced_at`, `last_error` | shown on the Profile page; `last_error` ≤ 500 chars |
+
 ### Row Level Security
 
-Both tables: RLS on; `select/insert/update/delete` (profiles: no delete) only where
+`todos` and `profiles`: RLS on; `select/insert/update/delete` (profiles: no delete) only where
 `user_id = auth.uid()`. Verified by `scripts/rls-check.mjs` (user B cannot read, update,
-delete, or spoof rows of user A) and by DB rejecting invalid enums.
+delete, or spoof rows of user A), that signed-in users can't read or write
+`google_calendar_links` at all, and by DB rejecting invalid enums.
 
 ### Keeping the layers in sync
 
@@ -322,6 +354,56 @@ format (server locale independent).
 `EMAIL_FROM` defaults to `TaskFlow <onboarding@resend.dev>`, which **only delivers to the email
 the Resend account was created with** until a domain is verified in Resend.
 
+## 11b. Google Calendar sync (v4)
+
+Pieces: `google_calendar_links` table, `lib/gcalEvents.ts` (pure, unit-tested), `lib/google.ts`
+(server), `lib/gcalRoute.ts`, the `/api/gcal/*` routes, `/api/cron/gcal`, `lib/gcalClient.ts`,
+`GoogleCalendarSettings.tsx`. No Google SDK: plain `fetch` to the OAuth and Calendar v3 REST
+endpoints.
+
+**Connect.** The button is a plain link to `/api/gcal/connect?tz=<browser zone>`. It stores
+`{state, tz}` in an httpOnly, `SameSite=Lax` cookie scoped to `/api/gcal` (10 min) and redirects
+to Google with scopes `openid email calendar.app.created`, `access_type=offline`,
+`prompt=consent` (always yields a refresh token). `/api/gcal/callback` checks the cookie state,
+exchanges the code, **refuses if the calendar scope was unticked**, creates the "TaskFlow"
+calendar (first connect only; reconnect reuses `calendar_id`), upserts the encrypted refresh
+token, runs a first sync, and redirects to `/profile?gcal=connected` or
+`?gcal=error&reason=<code>`. Reasons are fixed codes (`denied expired scope not-configured
+migration failed`), mapped to text in `ProfileApp`, so the URL can't inject messages.
+
+**Mapping** (`buildEvent`). Only tasks with `due_date`. Event id = task UUID without dashes
+(valid base32hex), so ids are deterministic and syncs are idempotent. All-day (`end` = next
+day), `transparency: transparent`, `colorId` by priority (P0 11 Tomato, P1 6 Tangerine, P2 5
+Banana, P3 9 Blueberry, P4 8 Graphite), completed → "✓ " prefix, graphite, no recurrence. Repeat →
+`RRULE` (`weekdays` = `WEEKLY;BYDAY=MO..FR`). Description: priority/list/tags line, subtasks,
+notes, app link (plain text). `extendedProperties.private = {taskflow: "1", tfhash}` where
+`tfhash` is an FNV-1a fingerprint of the body.
+
+**Sync** (`syncUser`, always a full reconcile for one user):
+1. Decrypt the refresh token → access token. `invalid_grant` → `GoogleAuthRevokedError`, stored as
+   `last_error` ("…Reconnect Google Calendar."), which the UI turns into a Reconnect link.
+2. List events with `privateExtendedProperty=taskflow=1` (so events the user adds by hand are never
+   touched). 404/410 → the user deleted the calendar: create a new one, save its id.
+3. Read the user's dated tasks (service role, `.eq("user_id")`), `planSync()`: insert new, update
+   when `tfhash` differs, skip unchanged, delete events with no matching dated task.
+4. Writes run 5 at a time, max `MAX_WRITES_PER_RUN` (120) per run; the rest is reported as
+   `remaining` and picked up by the next run. Insert → 409 (id exists, e.g. a deleted event) →
+   PUT with `status: confirmed` restores it. Update → 404 → insert. Delete → 404/410 is fine.
+5. Store `last_synced_at` and the first per-event error (or null).
+
+**When it runs.**
+- Client: `useCreateTodo/useUpdateTodo/useDeleteTodo` call `scheduleCalendarSync(qc)` on success.
+  It's a no-op unless the cached `["gcal"]` status says connected (loaded by `useGcalStatus()` in
+  `TodoApp`). Debounced 3 s, one request at a time, repeats while `remaining > 0`. If the page is
+  hidden during the quiet period, it fires immediately with `fetch(…, {keepalive: true})`.
+- "Sync now" button: loops up to 10 batches.
+- `/api/cron/gcal` every 15 min from the same GitHub workflow (separate step,
+  `if: !cancelled()`). Returns 200 with a note when Google isn't configured or the migration is
+  missing, so the shared workflow stays green. Skips users whose last error is "access revoked".
+
+**Disconnect.** Optional calendar delete, then token revoke (both best effort), then the row is
+deleted.
+
 ## 12. UI system
 
 - **Layout:** sidebar is fixed at `md` (≥ 768 px) and becomes a slide-in dialog on phones.
@@ -356,8 +438,9 @@ deploy, the first load may show old static files; a second load picks up the new
 | Concern | Control |
 |---------|---------|
 | Data isolation | RLS on `todos` and `profiles`; anon key only in the browser |
-| Service-role key | `SUPABASE_SERVICE_ROLE_KEY`, server env only, used only in `lib/supabase/admin.ts` from the cron route |
-| Cron endpoint | `CRON_SECRET` bearer check with `timingSafeEqual`; 503 if unset |
+| Service-role key | `SUPABASE_SERVICE_ROLE_KEY`, server env only, used only in `lib/supabase/admin.ts` from the cron routes and the `/api/gcal` routes (after `getUser()`) |
+| Cron endpoints | `CRON_SECRET` bearer check with `timingSafeEqual` (`lib/cronAuth.ts`); 503 if unset |
+| Google tokens | Refresh token AES-256-GCM encrypted with `GOOGLE_TOKEN_KEY`; table not accessible to anon/authenticated; scope limited to app-created calendars; OAuth `state` cookie (httpOnly) against CSRF; token never sent to the browser |
 | Input | zod on the client + DB CHECK constraints as the source of truth |
 | XSS | React escaping; email HTML built with `escapeHtml`; no user HTML rendered |
 | Headers | `next.config.ts`: nosniff, `X-Frame-Options: DENY`, referrer policy, permissions policy; Vercel adds HSTS |
@@ -375,6 +458,8 @@ deploy, the first load may show old static files; a second load picks up the new
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel (Prod), `.env.local` | cron route only. A Supabase `eyJ…` (or `sb_secret_…`) key | for email |
 | `CRON_SECRET` | Vercel (Prod) **and** GitHub secret | cron auth; must be identical in both | for email |
 | `APP_URL` | GitHub secret | workflow target, no trailing slash | for email |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Vercel (Prod), `.env.local` | `lib/google.ts`, OAuth web client | for Google Calendar |
+| `GOOGLE_TOKEN_KEY` | Vercel (Prod), `.env.local` | encrypts refresh tokens. Changing it makes every user reconnect | for Google Calendar |
 | `E2E_EMAIL`, `E2E_PASSWORD`, `E2E_BASE_URL` | shell only | Playwright | for e2e |
 
 Vercel only applies changed variables on a **new deployment**.

@@ -87,5 +87,15 @@ export type Profile = {
   email_digest_time: string;
   timezone: string;
 };
+/** Google Calendar sync state for the signed-in user, from `GET /api/gcal`. */
+export type GcalStatus = {
+  /** The server has the GOOGLE_* settings. */
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+};
+
 /** `inbox | today | upcoming | all | completed`, `list:<name>` or `tag:<name>`. */
 export type ViewKey = string;

@@ -15,7 +15,7 @@ Touch these, in this order:
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `supabase/migrations/0004_<name>.sql` | **New file.** `alter table public.todos add column if not exists estimate_minutes int check (estimate_minutes is null or estimate_minutes between 1 and 1440);` Re-runnable. Never edit 0001–0003 |
+| 1 | `supabase/migrations/0005_<name>.sql` | **New file.** `alter table public.todos add column if not exists estimate_minutes int check (estimate_minutes is null or estimate_minutes between 1 and 1440);` Re-runnable. Never edit 0001–0004 |
 | 2 | `src/lib/types.ts` | Add to `Todo`, `NewTodo` (optional), and the `TodoPatch` pick list |
 | 3 | `src/lib/schema.ts` | Add to `newTodoSchema` (`.optional()`) and `todoPatchSchema`. Same limits as the SQL CHECK |
 | 4 | `src/lib/todos.ts` | Default it in `normalizeTodo()` (`row.estimate_minutes ?? null`). Update the migration hint in `fail()` to name the new file |
@@ -23,6 +23,7 @@ Touch these, in this order:
 | 6 | UI | Edit control in `EditSheet.tsx` (include it in the `onSave` patch); display in `TodoRow.tsx`; optional Composer chip / quick-add token in `quickadd.ts` |
 | 7 | Tests | Fixture factories in `tests/unit/sort.test.ts`, `views.test.ts`, `order.test.ts`, `calendar.test.ts`, `tests/component/TodoApp.test.tsx` and `ProfileApp.test.tsx` build full `Todo` objects, so add the field there. Add schema tests for limits |
 | 8 | Digest (if it should appear in email) | `DigestTodo` + the `select(...)` column lists in **both** `api/cron/digest/route.ts` and `api/digest/test/route.ts` + `buildDigest` |
+| 8b | Google Calendar (if it should appear on the event) | `SyncTodo` + `SYNC_COLUMNS` + `buildEvent` in `gcalEvents.ts`. Changing the event body changes every fingerprint, so the next sync rewrites all events once (capped at 120 per run) |
 | 9 | Docs | Data model table in 02-ARCHITECTURE §4, feature list in 01-PRD |
 | 10 | Human | Run the new migration in Supabase **before** deploying code that writes the column |
 

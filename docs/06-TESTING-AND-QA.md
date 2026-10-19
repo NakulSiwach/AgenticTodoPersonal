@@ -4,12 +4,16 @@
 
 | Layer | Tool | Files | Covers |
 |-------|------|-------|--------|
-| Unit | Vitest | `tests/unit/*.test.ts` | schema limits, sort, views (membership, grouping, counts, progress), order math, quick-add parser, dates/repeat stepping, calendar grid/stats, digest (content, escaping, timezone send window), palette contrast |
-| Component | Vitest + Testing Library + jsdom | `tests/component/TodoApp.test.tsx`, `ProfileApp.test.tsx` | add/toggle/edit/delete+undo, repeat rollover, optimistic rollback + toast, insert-then-update race, quick-add, search, list filter, colors, subtasks/tags/due, dropdown Escape, drag handles shown/hidden (actual dragging is only covered manually), profile tabs, digest settings save, test-email success/failure (mocked fetch), display name |
+| Unit | Vitest | `tests/unit/*.test.ts` | schema limits, sort, views (membership, grouping, counts, progress), order math, quick-add parser, dates/repeat stepping, calendar grid/stats, digest (content, escaping, timezone send window), palette contrast, Google Calendar event mapping + sync plan (`gcalEvents`), token encryption + `syncUser` against an in-memory fake Google API (idempotency, 409 restore, hand-made events untouched, deleted calendar, write cap, revoked access) (`google.test.ts`, node environment), debounced auto-sync (`gcalClient`) |
+| Component | Vitest + Testing Library + jsdom | `tests/component/TodoApp.test.tsx`, `ProfileApp.test.tsx`, `GoogleCalendarSettings.test.tsx` (not configured / connect link / sync now / error + reconnect / disconnect) | add/toggle/edit/delete+undo, repeat rollover, optimistic rollback + toast, insert-then-update race, quick-add, search, list filter, colors, subtasks/tags/due, dropdown Escape, drag handles shown/hidden (actual dragging is only covered manually), profile tabs, digest settings save, test-email success/failure (mocked fetch), display name |
 | E2E | Playwright (Pixel 7 + Desktop Chrome) | `e2e/todo.spec.ts` | redirect when signed out; add → priority → complete → reload → uncomplete → colors → delete + undo → delete; quick-add tokens |
-| Security | Node script, real DB | `scripts/rls-check.mjs` | two accounts: no cross-user read/update/delete/insert; DB rejects bad enums; `completed_at` trigger |
+| Security | Node script, real DB | `scripts/rls-check.mjs` | two accounts: no cross-user read/update/delete/insert; DB rejects bad enums; `completed_at` trigger; no client access to `google_calendar_links` |
 
-Current totals: 94 unit + component tests; 3 e2e tests × 2 devices.
+Current totals: 126 unit + component tests; 3 e2e tests × 2 devices.
+
+The real Google consent screen and Calendar API are **not** covered automatically (needs a Google
+account + OAuth client). Manual check after Google changes: connect, add a dated task, see it in
+Google Calendar within seconds, edit/complete/delete it, Sync now, Disconnect.
 
 ## 2. How to run
 ```bash

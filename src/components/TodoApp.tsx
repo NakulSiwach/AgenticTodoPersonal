@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDue, nextOccurrence } from "@/lib/dates";
 import { useToday } from "@/lib/useToday";
 import { orderAfterMove } from "@/lib/order";
+import { useGcalStatus } from "@/lib/gcalClient";
 import { useCreateTodo, useDeleteTodo, useTodos, useUpdateTodo } from "@/lib/queries";
 import type { Priority, PriorityFilter, SortKey, Todo, TodoPatch, ViewKey } from "@/lib/types";
 import {
@@ -46,6 +47,8 @@ export function TodoApp({ email }: { email: string }) {
   const create = useCreateTodo();
   const update = useUpdateTodo();
   const remove = useDeleteTodo();
+  // Loads the Google Calendar status so task writes know whether to sync.
+  useGcalStatus();
   const toast = useToast();
   const today = useToday();
 

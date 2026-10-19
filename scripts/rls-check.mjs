@@ -57,6 +57,18 @@ check("completed_at set by trigger", !!done?.completed_at);
 const { data: undone } = await a.c.from("todos").update({ completed: false }).eq("id", row.id).select().single();
 check("completed_at cleared on uncomplete", undone?.completed_at === null);
 
+// google_calendar_links holds OAuth tokens: signed-in users get no access at all (server only).
+const { data: gRead, error: gReadErr } = await a.c.from("google_calendar_links").select("*");
+check(
+  "Users cannot read google_calendar_links",
+  gReadErr?.code === "42501" || (!gReadErr && gRead?.length === 0),
+  gReadErr ? `${gReadErr.code}${gReadErr.code === "PGRST205" ? ": run migration 0004" : ""}` : `rows=${gRead?.length}`,
+);
+const { error: gInsErr } = await a.c
+  .from("google_calendar_links")
+  .insert({ user_id: a.id, calendar_id: "x", refresh_token_enc: "x" });
+check("Users cannot write google_calendar_links", gInsErr?.code === "42501", gInsErr?.code);
+
 await a.c.from("todos").delete().eq("id", row.id);
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll RLS checks passed");
 console.log(`(throwaway accounts left in Supabase Auth: ${a.email}, ${b.email})`);

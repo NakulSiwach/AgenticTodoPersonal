@@ -16,8 +16,10 @@ production.
 1. **Never put the service-role key in client code.** `src/lib/supabase/admin.ts` may only be
    imported by server route handlers that authenticate the caller themselves.
 2. **RLS stays on.** Every new table gets RLS + `user_id = auth.uid()` policies in its migration.
-   Extend `scripts/rls-check.mjs` for new tables.
-3. **Migrations are new files, additive and re-runnable.** Never edit `0001`–`0003`. A human runs
+   Extend `scripts/rls-check.mjs` for new tables. Exception: tables holding secrets
+   (`google_calendar_links`) get RLS with **no** policies and are reached only via server routes.
+   **`src/lib/google.ts` and `gcalRoute.ts` are server-only**, same as `admin.ts`.
+3. **Migrations are new files, additive and re-runnable.** Never edit `0001`–`0004`. A human runs
    them in Supabase. Code that needs a column ships *after* its migration is applied.
 4. **Keep SQL CHECK, `types.ts`, and `schema.ts` in agreement** for every enum and limit.
 5. **Write through the hooks in `src/lib/queries.ts`.** Don't call `todos.ts` from components.
@@ -52,6 +54,7 @@ If a gate fails three times in a row on the same problem, stop and report the ex
 | Set GitHub Actions secrets (`CRON_SECRET`, `APP_URL`) | GitHub → Settings → Secrets and variables → Actions |
 | Supabase auth settings, URL configuration | Supabase dashboard |
 | Resend keys / domain verification | resend.com |
+| Google OAuth client, consent screen, redirect URIs | console.cloud.google.com (see docs/05 §3) |
 | Install on a phone | the phone |
 
 When a change needs one of these, put exact click-by-click steps in `PROJECT_STATUS.md` and in

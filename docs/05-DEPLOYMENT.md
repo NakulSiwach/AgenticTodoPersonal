@@ -36,6 +36,9 @@ and `select('<col>')`; a missing column returns a "schema cache" error.
 | `SUPABASE_SERVICE_ROLE_KEY` | Prod | Supabase service_role key (`eyJ…`) or a new `sb_secret_…` key. Secret |
 | `CRON_SECRET` | Prod | long random string, identical to the GitHub secret |
 | `EMAIL_FROM` | optional | e.g. `TaskFlow <hello@yourdomain.com>`, needs a verified Resend domain |
+| `GOOGLE_CLIENT_ID` | Prod | OAuth web client id (`…apps.googleusercontent.com`) |
+| `GOOGLE_CLIENT_SECRET` | Prod | OAuth web client secret (`GOCSPX-…`). Secret |
+| `GOOGLE_TOKEN_KEY` | Prod | long random string; encrypts stored Google tokens. Changing it = everyone reconnects. Secret |
 
 **Changing a variable does nothing until you redeploy:** Deployments → ⋯ on the latest →
 Redeploy.
@@ -48,6 +51,24 @@ Redeploy.
 - Authentication → Providers → Email: **Confirm email OFF**.
 - Authentication → URL Configuration: Site URL = the Vercel URL; redirect URLs
   `https://agentic-todo-personal.vercel.app/**`, `http://localhost:3000/**`.
+
+### Google Cloud (for Google Calendar sync)
+1. https://console.cloud.google.com → project picker → **New project** (e.g. "TaskFlow").
+2. **APIs & Services → Library** → "Google Calendar API" → **Enable**.
+3. **Google Auth Platform** (OAuth consent screen) → Get started: app name `TaskFlow`, your
+   email, audience **External**.
+4. **Data access → Add or remove scopes** → add
+   `https://www.googleapis.com/auth/calendar.app.created` (plus `openid`, `.../auth/userinfo.email`) → Save.
+5. **Audience → Publish app** (status "In production"). In "Testing" status Google expires the
+   connection every 7 days. Unverified is fine for personal use: on connect, Google shows "Google
+   hasn't verified this app" → **Advanced → Go to TaskFlow (unsafe)**.
+6. **Clients → Create client → Web application.** Authorized redirect URIs (exact):
+   `https://agentic-todo-personal.vercel.app/api/gcal/callback` and
+   `http://localhost:3000/api/gcal/callback`. Copy the client id and secret into Vercel (above)
+   and `.env.local`, then redeploy.
+
+The redirect URI is built from the request origin, so Vercel **preview** URLs won't work unless
+added in step 6.
 
 ### Local `.env.local` (git-ignored)
 Same names as `.env.example`. The cron secret here does **not** need to match production.
@@ -64,6 +85,9 @@ E2E_BASE_URL=$B E2E_EMAIL=… E2E_PASSWORD=… npm run e2e        # full browser
 Scheduler: GitHub → Actions → Daily digest → Run workflow. Success log:
 `{"checked":N,"sent":0,"skipped":N,"failed":0}`.
 Email: Profile → Notifications → Send me a test email now.
+Google Calendar: `curl -s $B/api/cron/gcal` → `{"error":"Unauthorized"}`; the workflow's "Re-sync
+Google Calendars" step logs `{"checked":N,"synced":N,…,"failed":0}` (or a "not configured" note).
+In the app: Profile → Calendar → Connect, then Sync now.
 
 ## 5. Troubleshooting (real incidents first)
 
@@ -80,6 +104,10 @@ Email: Profile → Notifications → Send me a test email now.
 | Digest never arrives, test email works | Workflow disabled (60 days idle), secrets wrong, or no open tasks due today/overdue (nothing is sent then) | Check Actions tab; run it by hand |
 | Old UI after deploy | Service worker cached static files | Reload once more / reopen the app |
 | Login works locally but email links fail | URL not in Supabase redirect list | Add it (§3) |
+| Google: "Error 400: redirect_uri_mismatch" | Callback URL not listed on the OAuth client | Add the exact `…/api/gcal/callback` URL (§3 Google Cloud step 6) |
+| Google card: "isn't set up on the server yet" | A `GOOGLE_*` variable missing, or no redeploy | Add all three, redeploy |
+| Google card: "Google access was removed or expired" | Access removed at myaccount.google.com, or app still in Testing (7-day expiry) | Publish the app (§3 step 5), then Reconnect |
+| Google: "Error 403: access_denied … has not completed the Google verification process" | App in Testing and your account isn't a test user | Publish the app, or add yourself under Audience → Test users |
 
 ## 6. Rollback
 Vercel → Deployments → pick a good one → ⋯ → Promote to Production. Then fix forward with a new
@@ -88,6 +116,9 @@ commit. Database migrations are not rolled back automatically; write a new migra
 ## 7. Key rotation
 - Resend: create a new key, update Vercel, redeploy, delete the old key in Resend.
 - `CRON_SECRET`: change in both Vercel and GitHub, redeploy.
+- `GOOGLE_CLIENT_SECRET`: add a new secret on the OAuth client, update Vercel, redeploy, delete the
+  old one. `GOOGLE_TOKEN_KEY`: changing it makes stored tokens unreadable, so every user must
+  reconnect (Profile → Calendar).
 - Supabase service role: create a **secret key** (`sb_secret_…`) under Settings → API Keys →
   Publishable and secret API keys, put it in `SUPABASE_SERVICE_ROLE_KEY`, redeploy. Disabling the
   legacy JWT keys also disables the legacy **anon** key, so first switch
@@ -96,4 +127,5 @@ commit. Database migrations are not rolled back automatically; write a new migra
 ## 8. Costs and limits (all free)
 Vercel Hobby (personal use), Supabase Free (500 MB DB; pauses when idle; no automatic backups,
 so export tables occasionally), GitHub Actions (free for public repos), Resend Free (daily and
-monthly send caps, far above one digest a day).
+monthly send caps, far above one digest a day), Google Calendar API (free; per-user rate limits
+are why a sync run writes at most 120 events).

@@ -2,12 +2,12 @@
 
 A personal TODO app for phone and laptop: priorities (P0–P4), text colors and highlights, due
 dates, repeating tasks, lists, tags, subtasks, quick-add typing, drag-to-reorder, a calendar,
-and an optional daily email of what's due. Installable as an app (PWA). Runs entirely on free
+an optional daily email of what's due, and optional sync of dated tasks to Google Calendar. Installable as an app (PWA). Runs entirely on free
 tiers.
 
 - **Live:** https://agentic-todo-personal.vercel.app
 - **Stack:** Next.js 16 + React 19 + TypeScript + Tailwind 4 · Supabase (Postgres, Auth, Row
-  Level Security) · Vercel · Resend (email) · GitHub Actions (scheduler)
+  Level Security) · Vercel · Resend (email) · Google Calendar API · GitHub Actions (scheduler)
 - **Repo:** https://github.com/NakulSiwach/AgenticTodoPersonal, branch `master` (auto-deploys)
 
 ## Start here

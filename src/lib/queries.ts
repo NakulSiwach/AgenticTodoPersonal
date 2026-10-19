@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/Toast";
+import { scheduleCalendarSync } from "@/lib/gcalClient";
 import { createTodo, deleteTodo, listTodos, updateTodo } from "@/lib/todos";
 import type { NewTodo, Todo, TodoPatch } from "@/lib/types";
 
@@ -73,7 +74,9 @@ function useTodoCache() {
     if (qc.isMutating() > 1) return;
     set((list) => list.map((t) => (t.id === saved.id ? saved : t)));
   };
-  return { current, cancel, set, restore, refresh, adopt };
+  // Every successful write nudges the Google Calendar sync (a no-op unless connected).
+  const synced = () => scheduleCalendarSync(qc);
+  return { current, cancel, set, restore, refresh, adopt, synced };
 }
 
 export function useCreateTodo() {
@@ -96,7 +99,10 @@ export function useCreateTodo() {
       );
       return { prev: vars.prev };
     },
-    onSuccess: (saved) => cache.adopt(saved),
+    onSuccess: (saved) => {
+      cache.adopt(saved);
+      cache.synced();
+    },
     onError: (err, _vars, ctx) => {
       cache.restore(ctx?.prev);
       toast.push({ message: `Could not add todo: ${err.message}` });
@@ -129,7 +135,10 @@ export function useUpdateTodo() {
       cache.set((list) => withPatch(list, id, patch));
       return { prev };
     },
-    onSuccess: (saved) => cache.adopt(saved),
+    onSuccess: (saved) => {
+      cache.adopt(saved);
+      cache.synced();
+    },
     onError: (err, _vars, ctx) => {
       cache.restore(ctx?.prev);
       toast.push({ message: `Could not save change: ${err.message}` });
@@ -162,6 +171,7 @@ export function useDeleteTodo() {
       cache.set((list) => list.filter((t) => t.id !== id));
       return { prev };
     },
+    onSuccess: () => cache.synced(),
     onError: (err, _vars, ctx) => {
       cache.restore(ctx?.prev);
       toast.push({ message: `Could not delete: ${err.message}` });
