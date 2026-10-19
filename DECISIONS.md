@@ -28,8 +28,17 @@ Deviations and judgement calls made while building, versus `docs/`.
 | 22 | Custom `Dropdown` (portal + flip) instead of native `<select>` in most places | Consistent styling in dark mode and on the bottom add bar; native select kept on the row priority badge |
 | 23 | Profiles are created lazily by upsert, with client defaults when no row exists | No sign-up trigger needed; works for accounts created before v3 |
 | 24 | e2e uses `click()` + `expect(...).toBeChecked()` instead of `check()` | `check()` asserts in the same instant as the click and flakes with React controlled inputs |
-| 25 | Reminders are their own table, not tasks with a flag | No completion state, different schedule shapes (days of week, monthly day), shouldn't clutter task views or counts |
-| 26 | Reminders live in the same daily email (top section); email also goes out with reminders only | Owner asked for one email; a day with only "take medicines" still deserves a nudge |
-| 27 | Quotes are a curated local list, not a quotes API | Free APIs return generic or misattributed quotes, rate-limit, and add an outage point to the email. Deterministic per date |
-| 28 | `digest_quote_enabled` is only sent on save when changed | Saving digest settings keeps working before migration 0005 is applied |
-| 29 | Built on branch `feature/reminders-quotes` in a separate worktree, migration numbered 0005 | Another agent was working on Google Calendar (0004) in the main folder at the same time |
+| 25 | Google Calendar sync is **one-way** (TaskFlow → Google) | Two-way needs push channels/webhooks, conflict rules and a public HTTPS watch endpoint; one-way covers "see my tasks in my calendar" with far less to break |
+| 26 | Scope `calendar.app.created` and a dedicated **"TaskFlow" calendar**, not the primary calendar | TaskFlow can't read or change any other event; the user can hide/recolor the whole calendar; Disconnect can delete it cleanly |
+| 27 | Event id = task UUID without dashes; every sync is a full reconcile with a body fingerprint (`tfhash`) | No mapping table, no duplicate events from retries/overlapping runs, deletes are found by diff. Unchanged tasks cost no API write |
+| 28 | Sync triggers: debounced client call after writes + the existing 15-minute workflow (new step) | Instant in normal use; the cron catches offline edits, closed tabs and failures. No extra scheduler or cost |
+| 29 | `google_calendar_links` has RLS **with no policies** (+ `revoke`) instead of `user_id = auth.uid()` policies; tokens AES-256-GCM encrypted with `GOOGLE_TOKEN_KEY` | Refresh tokens must never reach the browser, even the owner's own. Encryption adds defense in depth if the table is ever exposed |
+| 30 | Google OAuth + Calendar via plain `fetch`, no `googleapis` SDK | A handful of endpoints; the SDK is very large. Same reasoning as #18 |
+| 31 | Callback errors are fixed reason codes in the URL, mapped to text in `ProfileApp` | Free-text error query params would let a crafted link show arbitrary messages inside the app |
+| 32 | Synced tasks: only those with a due date; finished ones stay as "✓ Title" (grey) | A calendar needs a date. Keeping finished tasks matches the in-app calendar's done/pending view |
+| 33 | `CRON_SECRET` check moved to `lib/cronAuth.ts` | Shared by `/api/cron/digest` and `/api/cron/gcal` |
+| 34 | Reminders are their own table, not tasks with a flag | No completion state, different schedule shapes (days of week, monthly day), shouldn't clutter task views or counts |
+| 35 | Reminders live in the same daily email (top section); email also goes out with reminders only | Owner asked for one email; a day with only "take medicines" still deserves a nudge |
+| 36 | Quotes are a curated local list, not a quotes API | Free APIs return generic or misattributed quotes, rate-limit, and add an outage point to the email. Deterministic per date |
+| 37 | `digest_quote_enabled` is only sent on save when changed | Saving digest settings keeps working before migration 0005 is applied |
+| 38 | Built on branch `feature/reminders-quotes` in a separate worktree, migration numbered 0005 | Another agent was working on Google Calendar (0004) in the main folder at the same time |

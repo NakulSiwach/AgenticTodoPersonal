@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Bell, CalendarDays, UserRound } from "lucide-react";
 import { useProfile } from "@/lib/profile";
@@ -8,8 +8,35 @@ import { useTodos } from "@/lib/queries";
 import { useToday } from "@/lib/useToday";
 import { AccountSettings } from "./AccountSettings";
 import { CalendarView } from "./CalendarView";
+import { GoogleCalendarSettings } from "./GoogleCalendarSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { TopActions } from "./ProfileMenu";
+import { useToast } from "./Toast";
+
+// Outcome codes from /api/gcal/callback (`/profile?gcal=…&reason=…`).
+const GCAL_MESSAGES: Record<string, string> = {
+  connected: "Google Calendar connected. Tasks with a due date are now in your TaskFlow calendar.",
+  denied: "Google Calendar wasn't connected: access was declined.",
+  expired: "The Google sign-in expired or didn't match. Please try again.",
+  scope: "Calendar access wasn't granted. Connect again and tick the calendar permission.",
+  "not-configured": "Google Calendar sync isn't set up on the server yet.",
+  migration: "Database needs the latest update: run supabase/migrations/0004_google_calendar.sql",
+  failed: "Couldn't connect Google Calendar. Please try again.",
+};
+
+/** Shows the result of the Google connect flow once, then cleans the URL. */
+function useGcalOutcome() {
+  const toast = useToast();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("gcal");
+    if (!outcome) return;
+    const key = outcome === "connected" ? "connected" : (params.get("reason") ?? "failed");
+    toast.push({ message: GCAL_MESSAGES[key] ?? GCAL_MESSAGES.failed });
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
 
 type Tab = "calendar" | "notifications" | "account";
 
@@ -24,6 +51,7 @@ export function ProfileApp({ email }: { email: string }) {
   const { data: profile } = useProfile();
   const { data: todos = [], isLoading, isError, error } = useTodos();
   const today = useToday();
+  useGcalOutcome();
 
   const name = profile?.display_name || email.split("@")[0] || "You";
   const initial = (name.trim()[0] ?? "?").toUpperCase();
@@ -81,7 +109,8 @@ export function ProfileApp({ email }: { email: string }) {
           ))}
         </div>
 
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="space-y-5">
+          {tab === "calendar" && <GoogleCalendarSettings />}
           {tab === "calendar" &&
             (isError ? (
               <p role="alert" className="text-red-600 dark:text-red-400">

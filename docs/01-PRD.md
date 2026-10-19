@@ -4,7 +4,8 @@ TaskFlow is a personal TODO app that works the same on phone and laptop, stores 
 cloud, installs to the home screen, and can email you each morning. One user per account;
 no sharing.
 
-Status legend: ✅ shipped (v1 = basics, v2 = organisation, v3 = profile/email/reorder).
+Status legend: ✅ shipped (v1 = basics, v2 = organisation, v3 = profile/email/reorder,
+v4 = Google Calendar sync).
 
 ## 1. Feature list
 
@@ -52,6 +53,21 @@ Status legend: ✅ shipped (v1 = basics, v2 = organisation, v3 = profile/email/r
 - ✅ v3 Never sent twice on the same day, even if the scheduler overlaps; failed sends retry on
   the next run (up to 3 hours after the chosen time).
 
+### Google Calendar sync (v4)
+- ✅ v4 Profile → Calendar → **Connect Google Calendar** (Google sign-in). TaskFlow creates its own
+  **"TaskFlow" calendar** in the user's Google account and can access only that calendar
+  (`calendar.app.created` scope). It can't see the user's other events.
+- ✅ v4 Every task with a due date becomes an all-day event: title, colored by priority, marked free
+  (doesn't block the day), description with priority, list, tags, subtasks, notes and a link to
+  the app. Repeating tasks use a matching Google repeat rule. Finished tasks stay as "✓ Title" in
+  grey. Removing a task or its due date removes the event.
+- ✅ v4 One-way: TaskFlow → Google. Changes push ~3 s after the last edit (immediately if the app is
+  closed or backgrounded), and a background job re-syncs every ~15 minutes as a safety net.
+  Events edited in Google are overwritten on the next change; events the user adds to the
+  TaskFlow calendar by hand are left alone.
+- ✅ v4 "Sync now", last-synced time, error message with a Reconnect link, and Disconnect (optionally
+  deleting the TaskFlow calendar from Google).
+
 ### App shell
 - ✅ v1 Installable PWA (Android "Install app", iOS "Add to Home Screen"), offline page.
 - ✅ v2 Theme: System / Light / Dark toggle (top right), no flash on load.
@@ -71,6 +87,10 @@ Status legend: ✅ shipped (v1 = basics, v2 = organisation, v3 = profile/email/r
 - GitHub disables scheduled workflows after 60 days without repo activity.
 - Offline: the app shell loads, but tasks need a connection (no offline queue).
 - No password reset UI yet (Supabase supports it; needs a page + redirect URL).
+- Google Calendar sync is one-way (edits in Google don't come back). Monthly repeats on the 29th–31st
+  can differ: TaskFlow moves to the month's last day; Google skips short months.
+- Google OAuth app left in "Testing" mode expires the connection every 7 days. Publish it (unverified
+  is fine for personal use; up to 100 users) to avoid that.
 
 ## 4. Ideas backlog (not built)
 Export/backup (JSON/CSV), password reset page, shared lists, reminders/push notifications, due

@@ -58,3 +58,20 @@ Tests: 94 unit + component passing.
 | Cron route | done | prod: 401 without/with wrong secret; local with secret → `{"checked":1,"sent":0,"skipped":1,"failed":0}` |
 | Email in production | done | owner confirmed test email works after replacing a Supabase key in `RESEND_API_KEY` |
 | Docs refresh for future agents | done | README, AGENT_INSTRUCTIONS, AGENTS.md pointer, docs/01–07, DECISIONS 13–24 |
+
+## v4: Google Calendar sync (2026-10-20)
+
+| Item | Status | Verification |
+|------|--------|--------------|
+| Migration `0004_google_calendar.sql` (server-only table) | written, **needs running by owner** | - |
+| Event mapping + sync plan (`gcalEvents.ts`) | done | 14 unit tests |
+| OAuth, token encryption, Calendar API, `syncUser` (`google.ts`) | done | 10 unit tests against an in-memory fake Google API (create, skip unchanged, update, delete, 409 restore, hand-made events untouched, deleted calendar recreated, 120-write cap, revoked access) |
+| Routes `/api/gcal`, `/connect`, `/callback`, `/sync`, `/disconnect`, `/api/cron/gcal` | done | `npm run build`; local prod server: cron 401 without/with wrong secret, 200 `{"checked":0,"note":"…not configured"}` with secret; `/api/gcal*` redirect to `/login` when signed out |
+| Auto-sync after task writes (debounced, keepalive on hide) | done | 3 unit tests (no-op when disconnected, debounce, batches) |
+| Profile → Calendar: Google Calendar card | done | 5 component tests |
+| Workflow step "Re-sync Google Calendars" | written | runs on next push |
+| `rls-check.mjs`: no client access to `google_calendar_links` | written | **not run**: needs migration 0004 applied |
+| Real Google consent + Calendar end to end | **not run** | needs the owner's Google Cloud OAuth client |
+
+Gate: typecheck, lint, `npm test` (126/126), `npm run build` all green. e2e not run (no `E2E_*`
+credentials in this session; task CRUD only changed by adding a post-success hook).
